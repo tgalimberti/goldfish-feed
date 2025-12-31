@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Goldfish Feed 🐠</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #18181b; 
+            --card-bg: #1f1f23;
+            --text-main: #efeff1;
+            --text-muted: #adadb8;
+            --border-radius: 4px;
+            
+            /* Event Colors */
+            --color-follow: #ff4f8d;
+            --color-sub: #bf94ff;
+            --color-giftsub: #a970ff;
+            --color-cheer: #00dbdb;
+            --color-donation: #00fa9a;
+            --color-redeem: #f5da55;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        /* Login Screen */
+        #login-screen {
+            display: flex;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+            position: absolute; top:0; left:0; right:0; bottom:0;
+            background: var(--bg-color);
+            z-index: 999;
+        }
+        .login-btn {
+            background-color: #9147ff;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.2rem;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .login-btn:hover { background-color: #772ce8; }
+        .hidden { display: none !important; }
+
+        /* Top Bar */
+        #top-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+        }
+        .settings-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: color 0.2s;
+        }
+        .settings-btn:hover { color: var(--text-main); }
+
+        /* Settings */
+        #controls {
+            background: var(--card-bg);
+            padding: 10px 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            border: 1px solid #333;
+        }
+
+        .settings-section {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
+        }
+        .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+        .toggles-grid {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .behavior-options {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .control-header {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            margin-bottom: 2px;
+        }
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        
+        input[type="checkbox"] {
+            accent-color: #9147ff;
+            cursor: pointer;
+        }
+
+        /* Feed container and events */
+        #feed {
+            display: flex;
+            flex-direction: column;
+            gap: 2px; 
+        }
+
+        .event-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px;
+            background-color: transparent;
+            border-left: 4px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        /* Icon container */
+        .icon-box {
+            width: 20px;
+            margin-right: 12px;
+            display: flex;
+            justify-content: center;
+            font-size: 16px;
+            margin-top: 1px;
+        }
+
+        /* Text */
+        .content {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .username {
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .message {
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .timestamp {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-left: 5px;
+        }
+
+        /* Highlighted format for unacknowledged events */
+
+        /* Follow */
+        .event-item.follow.active { border-left-color: var(--color-follow); }
+        .event-item.follow.active .icon-box { color: var(--color-follow); }
+
+        /* Sub */
+        .event-item.sub.active { border-left-color: var(--color-sub); }
+        .event-item.sub.active .icon-box { color: var(--color-sub); }
+
+        /* Gift sub */
+        .event-item.giftsub.active { border-left-color: var(--color-giftsub); }
+        .event-item.giftsub.active .icon-box { color: var(--color-giftsub); }
+
+        /* Cheer */
+        .event-item.cheer.active { border-left-color: var(--color-cheer); }
+        .event-item.cheer.active .icon-box { color: var(--color-cheer); }
+
+        /* Donation */
+        .event-item.donation.active { border-left-color: var(--color-donation); }
+        .event-item.donation.active .icon-box { color: var(--color-donation); }
+
+        /* Channel point redeem */
+        .event-item.redeem.active { border-left-color: var(--color-redeem); }
+        .event-item.redeem.active .icon-box { color: var(--color-redeem); }
+
+
+        /* Grey out after acknowledgement */
+        .event-item.acknowledged {
+            opacity: 0.5;
+            border-left-color: #333;
+        }
+        .event-item.acknowledged .icon-box {
+            color: #555;
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <button class="login-btn" onclick="authorize()">Connect with Twitch</button>
+    </div>
+
+    <div id="app-content" class="hidden">
+        
+        <div id="top-bar">
+            <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
+        </div>
+
+        <div id="controls" class="hidden">
+            <div class="settings-section">
+                <div class="control-header" style="color: #fff; margin-bottom: 8px;">Behavior</div>
+                <div class="behavior-options">
+                    <label title="If checked, clicking an event removes it completely instead of turning grey">
+                        <input type="checkbox" id="opt-delete-on-click"> Delete on Click
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-section">
+                <div class="toggles-grid" id="toggles-container"></div>
+            </div>
+        </div>
+
+        <div id="feed"></div>
+    </div>
+
+    <script>
+        const CLIENT_ID = 'lt7p3t0i66py3xi742ekkpkw8d1xvk';
+        const REDIRECT_URI = window.location.origin + window.location.pathname; 
+        
+        // State
+        let accessToken = null;
+        let userId = null;
+        let socket = null;
+        let sessionId = null;
+
+        // 1. Authentication
+        function authorize() {
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read';
+            const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
+            window.location.href = url;
+        }
+
+        function checkAuth() {
+            const hash = window.location.hash;
+            if (hash.includes('access_token')) {
+                const params = new URLSearchParams(hash.substring(1));
+                accessToken = params.get('access_token');
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-content').classList.remove('hidden');
+                
+                init();
+            }
+        }
+
+        async function init() {
+            try {
+                const userRes = await fetch('https://api.twitch.tv/helix/users', {
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
+                });
+                const userData = await userRes.json();
+                userId = userData.data[0].id;
+                console.log(`Logged in as: ${userData.data[0].display_name}`);
+                connectTwitchWebSocket();
+            } catch (e) {
+                console.error("Login failed:", e);
+                alert("Login failed. Check console.");
+            }
+        }
+
+        // 2. Twitch WebSocket
+        function connectTwitchWebSocket() {
+            socket = new WebSocket('wss://eventsub.wss.twitch.tv/ws');
+
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.metadata.message_type === 'session_welcome') {
+                    sessionId = data.payload.session.id;
+                    subscribeToEvents(); 
+                }
+                else if (data.metadata.message_type === 'notification') {
+                    handleNotification(data.payload);
+                }
+            };
+        }
+
+        // 3. Subscriptions
+        async function subscribeToEvents() {
+            const subs = [
+                { type: 'channel.follow', version: '2', condition: { broadcaster_user_id: userId, moderator_user_id: userId } },
+                { type: 'channel.subscribe', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.subscription.message', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.subscription.gift', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.cheer', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } }
+            ];
+
+            for (const sub of subs) {
+                await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Client-Id': CLIENT_ID,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        type: sub.type,
+                        version: sub.version,
+                        condition: sub.condition,
+                        transport: { method: 'websocket', session_id: sessionId }
+                    })
+                });
+            }
+            console.log("Subscriptions registered.");
+        }
+
+        // 4. Handle Events
+        function handleNotification(payload) {
+            const event = payload.event;
+            const subType = payload.subscription.type;
+            let data = null;
+
+            if (subType === 'channel.follow') {
+                data = { type: 'follow', user: event.user_name, message: 'Followed you' };
+            } 
+            else if (subType === 'channel.subscribe') {
+                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
+                data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
+            } 
+            else if (subType === 'channel.subscription.message') {
+                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
+                data = { type: 'sub', user: event.user_name, message: `Resubscribed for ${event.cumulative_months} months (Tier ${tier})` };
+            }
+            else if (subType === 'channel.subscription.gift') {
+                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
+                const count = event.total;
+                const gifter = event.is_anonymous ? 'Anonymous' : event.user_name;
+                data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
+            } 
+            else if (subType === 'channel.cheer') {
+                const user = event.is_anonymous ? 'Anonymous' : event.user_name;
+                data = { type: 'cheer', user: user, message: `Cheered ${event.bits} bits` };
+            } 
+            else if (subType === 'channel.channel_points_custom_reward_redemption.add') {
+                data = { type: 'redeem', user: event.user_name, message: `Redeemed ${event.reward.title}` };
+            }
+
+            if (data) addEventToFeed(data);
+        }
+
+        // 5. UI Logic
+        const feed = document.getElementById('feed');
+        const togglesContainer = document.getElementById('toggles-container');
+        const controls = document.getElementById('controls');
+        
+        function toggleSettings() {
+            controls.classList.toggle('hidden');
+        }
+
+        // Setup UI
+        const settings = {};
+        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem'];
+        const icons = { follow: 'fa-solid fa-heart', sub: 'fa-solid fa-star', giftsub: 'fa-solid fa-gift', cheer: 'fa-solid fa-gem', redeem: 'fa-solid fa-ticket' };
+        const colors = { follow: '#ff4f8d', sub: '#bf94ff', giftsub: '#a970ff', cheer: '#00dbdb', redeem: '#f5da55' };
+
+        types.forEach(type => {
+            settings[type] = { show: true, highlight: true };
+            const group = document.createElement('div');
+            group.className = 'control-group';
+            group.innerHTML = `
+                <div class="control-header" style="color: ${colors[type]}">${type}</div>
+                <label><input type="checkbox" checked onchange="toggle('${type}', 'show', this.checked)"> Show</label>
+                <label><input type="checkbox" checked onchange="toggle('${type}', 'highlight', this.checked)"> Highlight</label>
+            `;
+            togglesContainer.appendChild(group);
+        });
+
+        function toggle(t, s, v) { settings[t][s] = v; }
+
+        function addEventToFeed(data) {
+            if (!settings[data.type].show) return;
+            
+            const el = document.createElement('div');
+            const initialState = settings[data.type].highlight ? 'active' : 'acknowledged';
+            el.className = `event-item ${data.type} ${initialState}`;
+            
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            el.innerHTML = `
+                <div class="icon-box"><i class="${icons[data.type]}"></i></div>
+                <div class="content">
+                    <div><span class="username">${data.user}</span><span class="timestamp">${time}</span></div>
+                    <div class="message">${data.message}</div>
+                </div>
+            `;
+            el.onclick = () => {
+                const deleteOnClick = document.getElementById('opt-delete-on-click').checked;
+
+                if (deleteOnClick) {
+                    el.remove();
+                } else {
+                    if (el.classList.contains('active')) {
+                        el.classList.remove('active');
+                        el.classList.add('acknowledged');
+                    }
+                }
+            };
+            feed.prepend(el);
+        }
+        
+        checkAuth();
+    </script>
+</body>
+</html>
