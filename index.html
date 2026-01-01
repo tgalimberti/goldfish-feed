@@ -55,11 +55,22 @@
         .login-btn:hover { background-color: #772ce8; }
         .hidden { display: none !important; }
 
-        /* Top Bar */
-        #top-bar {
+        /* App Header */
+        #app-header {
             display: flex;
-            justify-content: flex-end;
-            margin-bottom: 10px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+        .app-title {
+            font-weight: 800;
+            font-size: 1.4rem;
+            letter-spacing: -0.02em;
+        }
+        .username-highlight {
+            color: #9147ff;
         }
         .settings-btn {
             background: none;
@@ -142,6 +153,7 @@
             cursor: pointer;
             transition: all 0.2s ease;
             position: relative;
+            border-radius: var(--border-radius);
         }
 
         /* Icon container */
@@ -179,40 +191,55 @@
             margin-left: 5px;
         }
 
-        /* Highlighted format for unacknowledged events */
-
-        /* Follow */
+        /* Highlighted format for unacknowledged events (Minimal Style) */
         .event-item.follow.active { border-left-color: var(--color-follow); }
         .event-item.follow.active .icon-box { color: var(--color-follow); }
 
-        /* Sub */
         .event-item.sub.active { border-left-color: var(--color-sub); }
         .event-item.sub.active .icon-box { color: var(--color-sub); }
 
-        /* Gift sub */
         .event-item.giftsub.active { border-left-color: var(--color-giftsub); }
         .event-item.giftsub.active .icon-box { color: var(--color-giftsub); }
 
-        /* Cheer */
         .event-item.cheer.active { border-left-color: var(--color-cheer); }
         .event-item.cheer.active .icon-box { color: var(--color-cheer); }
 
-        /* Donation */
+        .event-item.redeem.active { border-left-color: var(--color-redeem); }
+        .event-item.redeem.active .icon-box { color: var(--color-redeem); }
+        
         .event-item.donation.active { border-left-color: var(--color-donation); }
         .event-item.donation.active .icon-box { color: var(--color-donation); }
 
-        /* Channel point redeem */
-        .event-item.redeem.active { border-left-color: var(--color-redeem); }
-        .event-item.redeem.active .icon-box { color: var(--color-redeem); }
+
+        /* Full highlight style (Optional) */
+        /* We force text to black for contrast on these bright colors */
+        
+        .style-full .event-item.active .username,
+        .style-full .event-item.active .message, 
+        .style-full .event-item.active .timestamp,
+        .style-full .event-item.active .action-text {
+            color: #000 !important;
+            opacity: 0.9;
+        }
+        
+        .style-full .event-item.active .icon-box { color: #000 !important; }
+
+        .style-full .event-item.follow.active { background-color: var(--color-follow); }
+        .style-full .event-item.sub.active { background-color: var(--color-sub); }
+        .style-full .event-item.giftsub.active { background-color: var(--color-giftsub); }
+        .style-full .event-item.cheer.active { background-color: var(--color-cheer); }
+        .style-full .event-item.redeem.active { background-color: var(--color-redeem); }
+        .style-full .event-item.donation.active { background-color: var(--color-donation); }
 
 
         /* Grey out after acknowledgement */
         .event-item.acknowledged {
             opacity: 0.5;
-            border-left-color: #333;
+            border-left: 4px solid #333;
+            background-color: transparent !important;
         }
         .event-item.acknowledged .icon-box {
-            color: #555;
+            color: #555 !important;
         }
         
     </style>
@@ -225,16 +252,20 @@
 
     <div id="app-content" class="hidden">
         
-        <div id="top-bar">
+        <div id="app-header">
+            <div class="app-title">Goldfish Feed <span id="header-username" class="username-highlight"></span></div>
             <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
         </div>
 
         <div id="controls" class="hidden">
             <div class="settings-section">
-                <div class="control-header" style="color: #fff; margin-bottom: 8px;">Behavior</div>
+                <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance & Behavior</div>
                 <div class="behavior-options">
+                    <label title="High contrast mode: Background color fills the card">
+                        <input type="checkbox" id="opt-full-color" onchange="toggleFullColor(this.checked)"> Full Color Background
+                    </label>
                     <label title="If checked, clicking an event removes it completely instead of turning grey">
-                        <input type="checkbox" id="opt-delete-on-click"> Delete on Click
+                        <input type="checkbox" id="opt-delete-on-click" onchange="savePref('delOnClick', this.checked)"> Delete on Click
                     </label>
                 </div>
             </div>
@@ -285,7 +316,12 @@
                 });
                 const userData = await userRes.json();
                 userId = userData.data[0].id;
-                console.log(`Logged in as: ${userData.data[0].display_name}`);
+                const displayName = userData.data[0].display_name;
+                
+                // Update header
+                document.getElementById('header-username').innerText = "for " + displayName;
+                console.log(`Logged in as: ${displayName}`);
+                
                 connectTwitchWebSocket();
             } catch (e) {
                 console.error("Login failed:", e);
@@ -379,8 +415,11 @@
         const togglesContainer = document.getElementById('toggles-container');
         const controls = document.getElementById('controls');
         
-        function toggleSettings() {
-            controls.classList.toggle('hidden');
+        function toggleSettings() { controls.classList.toggle('hidden'); }
+        function savePref(key, val) { localStorage.setItem(key, val); }
+        function toggleFullColor(checked) {
+            document.body.classList.toggle('style-full', checked);
+            savePref('fullColor', checked);
         }
 
         // Setup UI
@@ -407,6 +446,7 @@
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
+            // If highlight is OFF, we start as 'acknowledged', otherwise 'active'
             const initialState = settings[data.type].highlight ? 'active' : 'acknowledged';
             el.className = `event-item ${data.type} ${initialState}`;
             
@@ -421,7 +461,6 @@
             `;
             el.onclick = () => {
                 const deleteOnClick = document.getElementById('opt-delete-on-click').checked;
-
                 if (deleteOnClick) {
                     el.remove();
                 } else {
@@ -432,6 +471,15 @@
                 }
             };
             feed.prepend(el);
+        }
+
+        // Load preferences
+        if (localStorage.getItem('delOnClick') === 'true') {
+            document.getElementById('opt-delete-on-click').checked = true;
+        }
+        if (localStorage.getItem('fullColor') === 'true') {
+            document.getElementById('opt-full-color').checked = true;
+            document.body.classList.add('style-full');
         }
         
         checkAuth();
