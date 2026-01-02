@@ -12,13 +12,13 @@
             --text-muted: #adadb8;
             --border-radius: 4px;
             
-            /* Event Colors */
             --color-follow: #ff4f8d;
             --color-sub: #bf94ff;
             --color-giftsub: #a970ff;
             --color-cheer: #00dbdb;
             --color-donation: #00fa9a;
             --color-redeem: #f5da55;
+            --color-raid: #ff544f;
         }
 
         body {
@@ -30,7 +30,6 @@
             font-size: 13px;
         }
 
-        /* Login Screen */
         #login-screen {
             display: flex;
             height: 100vh;
@@ -55,7 +54,6 @@
         .login-btn:hover { background-color: #772ce8; }
         .hidden { display: none !important; }
 
-        /* App Header */
         #app-header {
             display: flex;
             justify-content: space-between;
@@ -82,7 +80,7 @@
         }
         .settings-btn:hover { color: var(--text-main); }
 
-        /* Settings */
+        /* Settings section */
         #controls {
             background: var(--card-bg);
             padding: 10px 15px;
@@ -210,10 +208,11 @@
         .event-item.donation.active { border-left-color: var(--color-donation); }
         .event-item.donation.active .icon-box { color: var(--color-donation); }
 
+        .event-item.raid.active { border-left-color: var(--color-raid); }
+        .event-item.raid.active .icon-box { color: var(--color-raid); }
+
 
         /* Full highlight style (Optional) */
-        /* We force text to black for contrast on these bright colors */
-        
         .style-full .event-item.active .username,
         .style-full .event-item.active .message, 
         .style-full .event-item.active .timestamp,
@@ -230,6 +229,7 @@
         .style-full .event-item.cheer.active { background-color: var(--color-cheer); }
         .style-full .event-item.redeem.active { background-color: var(--color-redeem); }
         .style-full .event-item.donation.active { background-color: var(--color-donation); }
+        .style-full .event-item.raid.active { background-color: var(--color-raid); }
 
 
         /* Grey out after acknowledgement */
@@ -288,7 +288,7 @@
         let socket = null;
         let sessionId = null;
 
-        // 1. Authentication
+        // Authentication
         function authorize() {
             const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
@@ -329,7 +329,7 @@
             }
         }
 
-        // 2. Twitch WebSocket
+        // Twitch WebSocket
         function connectTwitchWebSocket() {
             socket = new WebSocket('wss://eventsub.wss.twitch.tv/ws');
 
@@ -346,7 +346,7 @@
             };
         }
 
-        // 3. Subscriptions
+        // Subscriptions
         async function subscribeToEvents() {
             const subs = [
                 { type: 'channel.follow', version: '2', condition: { broadcaster_user_id: userId, moderator_user_id: userId } },
@@ -354,7 +354,8 @@
                 { type: 'channel.subscription.message', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.subscription.gift', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.cheer', version: '1', condition: { broadcaster_user_id: userId } },
-                { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } }
+                { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.raid', version: '1', condition: { to_broadcaster_user_id: userId } }
             ];
 
             for (const sub of subs) {
@@ -376,7 +377,7 @@
             console.log("Subscriptions registered.");
         }
 
-        // 4. Handle Events
+        // Handle Events
         function handleNotification(payload) {
             const event = payload.event;
             const subType = payload.subscription.type;
@@ -386,6 +387,9 @@
                 data = { type: 'follow', user: event.user_name, message: 'Followed you' };
             } 
             else if (subType === 'channel.subscribe') {
+                // Filter out gift recipients to prevent sub-bomb spam
+                if (event.is_gift) return; 
+                
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                 data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
             } 
@@ -406,11 +410,14 @@
             else if (subType === 'channel.channel_points_custom_reward_redemption.add') {
                 data = { type: 'redeem', user: event.user_name, message: `Redeemed ${event.reward.title}` };
             }
+            else if (subType === 'channel.raid') {
+                data = { type: 'raid', user: event.from_broadcaster_user_name, message: `Raided with ${event.viewers} viewers` };
+            }
 
             if (data) addEventToFeed(data);
         }
 
-        // 5. UI Logic
+        // UI Logic
         const feed = document.getElementById('feed');
         const togglesContainer = document.getElementById('toggles-container');
         const controls = document.getElementById('controls');
@@ -424,9 +431,9 @@
 
         // Setup UI
         const settings = {};
-        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem'];
-        const icons = { follow: 'fa-solid fa-heart', sub: 'fa-solid fa-star', giftsub: 'fa-solid fa-gift', cheer: 'fa-solid fa-gem', redeem: 'fa-solid fa-ticket' };
-        const colors = { follow: '#ff4f8d', sub: '#bf94ff', giftsub: '#a970ff', cheer: '#00dbdb', redeem: '#f5da55' };
+        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid'];
+        const icons = { follow: 'fa-solid fa-heart', sub: 'fa-solid fa-star', giftsub: 'fa-solid fa-gift', cheer: 'fa-solid fa-gem', redeem: 'fa-solid fa-ticket', raid: 'fa-solid fa-parachute-box' };
+        const colors = { follow: '#ff4f8d', sub: '#bf94ff', giftsub: '#a970ff', cheer: '#00dbdb', redeem: '#f5da55', raid: '#ff544f' };
 
         types.forEach(type => {
             settings[type] = { show: true, highlight: true };
@@ -473,7 +480,7 @@
             feed.prepend(el);
         }
 
-        // Load preferences
+        // Make preferences persist across sessions
         if (localStorage.getItem('delOnClick') === 'true') {
             document.getElementById('opt-delete-on-click').checked = true;
         }
