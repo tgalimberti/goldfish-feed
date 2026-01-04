@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Goldfish Feed 🐠</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐠</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -19,6 +20,8 @@
             --color-donation: #00fa9a;
             --color-redeem: #f5da55;
             --color-raid: #ff544f;
+            --color-poll: #00cefa;
+            --color-hypetrain: #ffb300;
         }
 
         body {
@@ -62,6 +65,21 @@
             padding-bottom: 10px;
             border-bottom: 2px solid #333;
         }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid #9147ff;
+            display: none; 
+        }
+        
         .app-title {
             font-weight: 800;
             font-size: 1.4rem;
@@ -211,6 +229,12 @@
         .event-item.raid.active { border-left-color: var(--color-raid); }
         .event-item.raid.active .icon-box { color: var(--color-raid); }
 
+        .event-item.poll.active { border-left-color: var(--color-poll); }
+        .event-item.poll.active .icon-box { color: var(--color-poll); }
+
+        .event-item.hypetrain.active { border-left-color: var(--color-hypetrain); }
+        .event-item.hypetrain.active .icon-box { color: var(--color-hypetrain); }
+
 
         /* Full highlight style (Optional) */
         .style-full .event-item.active .username,
@@ -230,6 +254,8 @@
         .style-full .event-item.redeem.active { background-color: var(--color-redeem); }
         .style-full .event-item.donation.active { background-color: var(--color-donation); }
         .style-full .event-item.raid.active { background-color: var(--color-raid); }
+        .style-full .event-item.poll.active { background-color: var(--color-poll); }
+        .style-full .event-item.hypetrain.active { background-color: var(--color-hypetrain); }
 
 
         /* Grey out after acknowledgement */
@@ -253,7 +279,10 @@
     <div id="app-content" class="hidden">
         
         <div id="app-header">
-            <div class="app-title">Goldfish Feed <span id="header-username" class="username-highlight"></span></div>
+            <div class="header-left">
+                <img id="user-avatar" class="header-avatar" alt="Avatar">
+                <div class="app-title">Goldfish Feed <span id="header-username" class="username-highlight"></span></div>
+            </div>
             <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
         </div>
 
@@ -287,10 +316,11 @@
         let userId = null;
         let socket = null;
         let sessionId = null;
+        let currentHypeLevel = 0; // Tracks hype train level to prevent spam
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read';
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -315,12 +345,19 @@
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
                 });
                 const userData = await userRes.json();
-                userId = userData.data[0].id;
-                const displayName = userData.data[0].display_name;
+                const user = userData.data[0];
+                userId = user.id;
                 
-                // Update header
-                document.getElementById('header-username').innerText = "for " + displayName;
-                console.log(`Logged in as: ${displayName}`);
+                // Update header with Name and Avatar
+                document.getElementById('header-username').innerText = "for " + user.display_name;
+                
+                if (user.profile_image_url) {
+                    const img = document.getElementById('user-avatar');
+                    img.src = user.profile_image_url;
+                    img.style.display = 'block';
+                }
+
+                console.log(`Logged in as: ${user.display_name}`);
                 
                 connectTwitchWebSocket();
             } catch (e) {
@@ -355,7 +392,12 @@
                 { type: 'channel.subscription.gift', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.cheer', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } },
-                { type: 'channel.raid', version: '1', condition: { to_broadcaster_user_id: userId } }
+                { type: 'channel.raid', version: '1', condition: { to_broadcaster_user_id: userId } },
+                { type: 'channel.poll.begin', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.poll.end', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.hype_train.begin', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.hype_train.progress', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.hype_train.end', version: '1', condition: { broadcaster_user_id: userId } }
             ];
 
             for (const sub of subs) {
@@ -387,9 +429,7 @@
                 data = { type: 'follow', user: event.user_name, message: 'Followed you' };
             } 
             else if (subType === 'channel.subscribe') {
-                // Filter out gift recipients to prevent sub-bomb spam
                 if (event.is_gift) return; 
-                
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                 data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
             } 
@@ -413,6 +453,28 @@
             else if (subType === 'channel.raid') {
                 data = { type: 'raid', user: event.from_broadcaster_user_name, message: `Raided with ${event.viewers} viewers` };
             }
+            else if (subType === 'channel.poll.begin') {
+                data = { type: 'poll', user: 'Poll Started', message: event.title };
+            }
+            else if (subType === 'channel.poll.end') {
+                const winner = event.choices.reduce((max, choice) => max.votes > choice.votes ? max : choice);
+                data = { type: 'poll', user: 'Poll Ended', message: `Winner: ${winner.title} (${winner.votes} votes)` };
+            }
+            else if (subType === 'channel.hype_train.begin') {
+                currentHypeLevel = 1;
+                data = { type: 'hypetrain', user: 'Hype Train', message: 'Hype Train has started!' };
+            }
+            else if (subType === 'channel.hype_train.progress') {
+                // Only trigger if we reached a NEW level
+                if (event.level > currentHypeLevel) {
+                    currentHypeLevel = event.level;
+                    data = { type: 'hypetrain', user: 'Hype Train', message: `Reached Level ${event.level}!` };
+                }
+            }
+            else if (subType === 'channel.hype_train.end') {
+                currentHypeLevel = 0; // Reset for next time
+                data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
+            }
 
             if (data) addEventToFeed(data);
         }
@@ -431,9 +493,29 @@
 
         // Setup UI
         const settings = {};
-        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid'];
-        const icons = { follow: 'fa-solid fa-heart', sub: 'fa-solid fa-star', giftsub: 'fa-solid fa-gift', cheer: 'fa-solid fa-gem', redeem: 'fa-solid fa-ticket', raid: 'fa-solid fa-parachute-box' };
-        const colors = { follow: '#ff4f8d', sub: '#bf94ff', giftsub: '#a970ff', cheer: '#00dbdb', redeem: '#f5da55', raid: '#ff544f' };
+        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain'];
+        
+        const icons = { 
+            follow: 'fa-solid fa-heart', 
+            sub: 'fa-solid fa-star', 
+            giftsub: 'fa-solid fa-gift', 
+            cheer: 'fa-solid fa-gem', 
+            redeem: 'fa-solid fa-ticket', 
+            raid: 'fa-solid fa-parachute-box',
+            poll: 'fa-solid fa-square-poll-vertical',
+            hypetrain: 'fa-solid fa-train'
+        };
+        
+        const colors = { 
+            follow: '#ff4f8d', 
+            sub: '#bf94ff', 
+            giftsub: '#a970ff', 
+            cheer: '#00dbdb', 
+            redeem: '#f5da55', 
+            raid: '#ff544f',
+            poll: '#00cefa',
+            hypetrain: '#ffb300'
+        };
 
         types.forEach(type => {
             settings[type] = { show: true, highlight: true };
@@ -453,7 +535,6 @@
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
-            // If highlight is OFF, we start as 'acknowledged', otherwise 'active'
             const initialState = settings[data.type].highlight ? 'active' : 'acknowledged';
             el.className = `event-item ${data.type} ${initialState}`;
             
@@ -480,7 +561,7 @@
             feed.prepend(el);
         }
 
-        // Make preferences persist across sessions
+        // Make preferences persist
         if (localStorage.getItem('delOnClick') === 'true') {
             document.getElementById('opt-delete-on-click').checked = true;
         }
