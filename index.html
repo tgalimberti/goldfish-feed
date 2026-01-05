@@ -80,6 +80,22 @@
             display: none; 
         }
         
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .viewercount {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #ff544f; 
+            font-weight: 700;
+            font-size: 1.1rem;
+            display: none; 
+        }
+        
         .app-title {
             font-weight: 800;
             font-size: 1.4rem;
@@ -200,6 +216,15 @@
             margin-top: 4px;
             font-style: italic;
         }
+        
+        /* Chat message styling (resubs/cheers) */
+        .chat-message {
+            margin-top: 4px;
+            color: var(--text-main);
+            font-family: inherit;
+            opacity: 0.9;
+            word-break: break-word;
+        }
 
         .timestamp {
             color: var(--text-muted);
@@ -207,7 +232,7 @@
             margin-left: 5px;
         }
 
-        /* Highlighted format for unacknowledged events (Minimal Style) */
+        /* Highlighted format for unacknowledged events (minimal style) */
         .event-item.follow.active { border-left-color: var(--color-follow); }
         .event-item.follow.active .icon-box { color: var(--color-follow); }
 
@@ -236,9 +261,10 @@
         .event-item.hypetrain.active .icon-box { color: var(--color-hypetrain); }
 
 
-        /* Full highlight style (Optional) */
+        /* Full highlight style */
         .style-full .event-item.active .username,
         .style-full .event-item.active .message, 
+        .style-full .event-item.active .chat-message,
         .style-full .event-item.active .timestamp,
         .style-full .event-item.active .action-text {
             color: #000 !important;
@@ -283,7 +309,14 @@
                 <img id="user-avatar" class="header-avatar" alt="Avatar">
                 <div class="app-title">Goldfish Feed <span id="header-username" class="username-highlight"></span></div>
             </div>
-            <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
+            
+            <div class="header-right">
+                <div id="viewercount" class="viewercount" title="Live Viewers">
+                    <i class="fa-solid fa-user-group"></i>
+                    <span id="viewer-number">0</span>
+                </div>
+                <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
+            </div>
         </div>
 
         <div id="controls" class="hidden">
@@ -316,7 +349,11 @@
         let userId = null;
         let socket = null;
         let sessionId = null;
-        let currentHypeLevel = 0; // Tracks hype train level to prevent spam
+        let currentHypeLevel = 0; 
+        
+        // Sub bomb logic state
+        let activeBombGifter = null;
+        let bombTimeout = null;
 
         // Authentication
         function authorize() {
@@ -348,9 +385,8 @@
                 const user = userData.data[0];
                 userId = user.id;
                 
-                // Update header with Name and Avatar
+                // Update header
                 document.getElementById('header-username').innerText = "for " + user.display_name;
-                
                 if (user.profile_image_url) {
                     const img = document.getElementById('user-avatar');
                     img.src = user.profile_image_url;
@@ -360,9 +396,33 @@
                 console.log(`Logged in as: ${user.display_name}`);
                 
                 connectTwitchWebSocket();
+                
+                fetchViewerCount();
+                setInterval(fetchViewerCount, 60000);
+
             } catch (e) {
                 console.error("Login failed:", e);
                 alert("Login failed. Check console.");
+            }
+        }
+
+        async function fetchViewerCount() {
+            if (!userId) return;
+            try {
+                const res = await fetch(`https://api.twitch.tv/helix/streams?user_id=${userId}`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
+                });
+                const data = await res.json();
+                const viewEl = document.getElementById('viewercount');
+                
+                if (data.data && data.data.length > 0) {
+                    document.getElementById('viewer-number').innerText = data.data[0].viewer_count;
+                    viewEl.style.display = 'flex';
+                } else {
+                    viewEl.style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Viewer fetch failed", e);
             }
         }
 
@@ -419,7 +479,7 @@
             console.log("Subscriptions registered.");
         }
 
-        // Handle Events
+        // Handle events
         function handleNotification(payload) {
             const event = payload.event;
             const subType = payload.subscription.type;
@@ -429,23 +489,58 @@
                 data = { type: 'follow', user: event.user_name, message: 'Followed you' };
             } 
             else if (subType === 'channel.subscribe') {
-                if (event.is_gift) return; 
-                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
+                // COMPLEX GIFT LOGIC:
+                // If it is a gift, we check if it is part of an active "Bomb".
+                // If activeBombGifter matches this gifter, we IGNORE it (because the summary event handles it).
+                // If NO bomb is active, we SHOW it (because it is likely a single direct gift).
+                
+                if (event.is_gift) {
+                    if (activeBombGifter === event.gifter_name) {
+                        return; // Suppress spam
+                    }
+                    // It's a single gift!
+                    const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
+                    const gifter = event.is_anonymous ? 'Anonymous' : event.gifter_name;
+                    data = { type: 'giftsub', user: gifter, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
+                } else {
+                    // Standard Prime/Paid Sub
+                    const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
+                    data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
+                }
             } 
             else if (subType === 'channel.subscription.message') {
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                data = { type: 'sub', user: event.user_name, message: `Resubscribed for ${event.cumulative_months} months (Tier ${tier})` };
+                const text = event.message ? event.message.text : '';
+                
+                data = { 
+                    type: 'sub', 
+                    user: event.user_name, 
+                    message: `Resubscribed for ${event.cumulative_months} months (Tier ${tier})`,
+                    chatMessage: text
+                };
             }
             else if (subType === 'channel.subscription.gift') {
-                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                 const count = event.total;
                 const gifter = event.is_anonymous ? 'Anonymous' : event.user_name;
-                data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
+                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
+
+                if (count > 1) {
+                    // Activate Bomb Mode
+                    activeBombGifter = gifter;
+                    if (bombTimeout) clearTimeout(bombTimeout);
+                    bombTimeout = setTimeout(() => { activeBombGifter = null; }, 5000); // 5s window
+                    
+                    data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
+                } 
             } 
             else if (subType === 'channel.cheer') {
                 const user = event.is_anonymous ? 'Anonymous' : event.user_name;
-                data = { type: 'cheer', user: user, message: `Cheered ${event.bits} bits` };
+                data = { 
+                    type: 'cheer', 
+                    user: user, 
+                    message: `Cheered ${event.bits} bits`, 
+                    chatMessage: event.message 
+                };
             } 
             else if (subType === 'channel.channel_points_custom_reward_redemption.add') {
                 data = { type: 'redeem', user: event.user_name, message: `Redeemed ${event.reward.title}` };
@@ -465,14 +560,13 @@
                 data = { type: 'hypetrain', user: 'Hype Train', message: 'Hype Train has started!' };
             }
             else if (subType === 'channel.hype_train.progress') {
-                // Only trigger if we reached a NEW level
                 if (event.level > currentHypeLevel) {
                     currentHypeLevel = event.level;
                     data = { type: 'hypetrain', user: 'Hype Train', message: `Reached Level ${event.level}!` };
                 }
             }
             else if (subType === 'channel.hype_train.end') {
-                currentHypeLevel = 0; // Reset for next time
+                currentHypeLevel = 0; 
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
             }
 
@@ -540,13 +634,21 @@
             
             const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-            el.innerHTML = `
+            let html = `
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 <div class="content">
                     <div><span class="username">${data.user}</span><span class="timestamp">${time}</span></div>
                     <div class="message">${data.message}</div>
-                </div>
             `;
+            
+            // Add chat message as sub-text to event (if available)
+            if (data.chatMessage) {
+                html += `<div class="chat-message">"${data.chatMessage}"</div>`;
+            }
+
+            html += `</div>`;
+            el.innerHTML = html;
+
             el.onclick = () => {
                 const deleteOnClick = document.getElementById('opt-delete-on-click').checked;
                 if (deleteOnClick) {
