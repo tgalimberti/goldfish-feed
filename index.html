@@ -351,8 +351,9 @@
         let sessionId = null;
         let currentHypeLevel = 0; 
         
-        // Sub bomb logic state
-        let activeBombGifter = null;
+        // Gift sync state
+        let activeBombWindow = false;
+        let recentSingleGifter = null;
         let bombTimeout = null;
 
         // Authentication
@@ -489,21 +490,24 @@
                 data = { type: 'follow', user: event.user_name, message: 'Followed you' };
             } 
             else if (subType === 'channel.subscribe') {
-                // COMPLEX GIFT LOGIC:
-                // If it is a gift, we check if it is part of an active "Bomb".
-                // If activeBombGifter matches this gifter, we IGNORE it (because the summary event handles it).
-                // If NO bomb is active, we SHOW it (because it is likely a single direct gift).
-                
                 if (event.is_gift) {
-                    if (activeBombGifter === event.gifter_name) {
-                        return; // Suppress spam
+                    // During a gift bomb window (gifts > 1), suppresses individual alerts
+                    if (activeBombWindow) {
+                        return; 
                     }
-                    // It's a single gift!
+                    
+                    // Attempt to retrieve the gifter's name from the recent gift event
+                    let gifterName = recentSingleGifter || 'A Mystery Gifter';
+                    
+                    // If we stored a name, use it and then clear it
+                    if (recentSingleGifter) {
+                        gifterName = recentSingleGifter;
+                        recentSingleGifter = null;
+                    }
+
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                    const gifter = event.is_anonymous ? 'Anonymous' : event.gifter_name;
-                    data = { type: 'giftsub', user: gifter, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
+                    data = { type: 'giftsub', user: gifterName, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
                 } else {
-                    // Standard Prime/Paid Sub
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                     data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
                 }
@@ -525,13 +529,19 @@
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
 
                 if (count > 1) {
-                    // Activate Bomb Mode
-                    activeBombGifter = gifter;
+                    // For sub bombs, show summary and suppress individual alerts
+                    activeBombWindow = true;
                     if (bombTimeout) clearTimeout(bombTimeout);
-                    bombTimeout = setTimeout(() => { activeBombGifter = null; }, 5000); // 5s window
+                    bombTimeout = setTimeout(() => { activeBombWindow = false; }, 5000); 
                     
                     data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
-                } 
+                } else {
+                    // For single sub gifts, store gifter's name for the upcoming 'channel.subscribe' event
+                    recentSingleGifter = gifter;
+                    // Timeout to clear if sync fails
+                    setTimeout(() => { recentSingleGifter = null; }, 500);
+                    return;
+                }
             } 
             else if (subType === 'channel.cheer') {
                 const user = event.is_anonymous ? 'Anonymous' : event.user_name;
