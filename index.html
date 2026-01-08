@@ -351,10 +351,13 @@
         let sessionId = null;
         let currentHypeLevel = 0; 
         
-        // Gift sync state
+        // Logic states
         let activeBombWindow = false;
         let recentSingleGifter = null;
         let bombTimeout = null;
+        
+        // De-duplication set (for resubs)
+        const handledEvents = new Set();
 
         // Authentication
         function authorize() {
@@ -439,6 +442,12 @@
                     subscribeToEvents(); 
                 }
                 else if (data.metadata.message_type === 'notification') {
+                    // Unique ID check to prevent duplicate messages if websocket resends
+                    const msgId = data.metadata.message_id;
+                    if (handledEvents.has(msgId)) return;
+                    handledEvents.add(msgId);
+                    setTimeout(() => handledEvents.delete(msgId), 60000); 
+                    
                     handleNotification(data.payload);
                 }
             };
@@ -491,15 +500,9 @@
             } 
             else if (subType === 'channel.subscribe') {
                 if (event.is_gift) {
-                    // During a gift bomb window (gifts > 1), suppresses individual alerts
-                    if (activeBombWindow) {
-                        return; 
-                    }
+                    if (activeBombWindow) return; // Suppress spam
                     
-                    // Attempt to retrieve the gifter's name from the recent gift event
-                    let gifterName = recentSingleGifter || 'A Mystery Gifter';
-                    
-                    // If we stored a name, use it and then clear it
+                    let gifterName = recentSingleGifter || 'Anonymous Gifter'; 
                     if (recentSingleGifter) {
                         gifterName = recentSingleGifter;
                         recentSingleGifter = null;
@@ -508,11 +511,24 @@
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                     data = { type: 'giftsub', user: gifterName, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
                 } else {
+                    // Check for duplicate resub
+                    // Key by user_id in the case of getting 'subscribe' and 'message' for the same user
+                    if (handledEvents.has(event.user_id + '_resub')) return;
+                    
+                    handledEvents.add(event.user_id + '_resub');
+                    setTimeout(() => handledEvents.delete(event.user_id + '_resub'), 10000);
+
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                    data = { type: 'sub', user: event.user_name, message: `Subscribed at Tier ${tier}` };
+                    data = { type: 'sub', user: event.user_name, message: `Subscribed (Tier ${tier})` };
                 }
             } 
             else if (subType === 'channel.subscription.message') {
+                // Add to dedupe list so channel.subscribe doesn't double fire if it arrives second
+                if (!handledEvents.has(event.user_id + '_resub')) {
+                    handledEvents.add(event.user_id + '_resub');
+                    setTimeout(() => handledEvents.delete(event.user_id + '_resub'), 10000);
+                }
+
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                 const text = event.message ? event.message.text : '';
                 
@@ -529,18 +545,15 @@
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
 
                 if (count > 1) {
-                    // For sub bombs, show summary and suppress individual alerts
                     activeBombWindow = true;
                     if (bombTimeout) clearTimeout(bombTimeout);
                     bombTimeout = setTimeout(() => { activeBombWindow = false; }, 5000); 
                     
                     data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
                 } else {
-                    // For single sub gifts, store gifter's name for the upcoming 'channel.subscribe' event
                     recentSingleGifter = gifter;
-                    // Timeout to clear if sync fails
-                    setTimeout(() => { recentSingleGifter = null; }, 500);
-                    return;
+                    setTimeout(() => { recentSingleGifter = null; }, 1000); // 1s timeout, increase if non-anon gifts continue to be mistaken as anon gifts
+                    return; 
                 }
             } 
             else if (subType === 'channel.cheer') {
