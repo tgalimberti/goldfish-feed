@@ -176,6 +176,11 @@
             gap: 2px; 
         }
 
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .event-item {
             display: flex;
             align-items: flex-start;
@@ -186,6 +191,7 @@
             transition: all 0.2s ease;
             position: relative;
             border-radius: var(--border-radius);
+            animation: slideIn 0.3s ease-out forwards;
         }
 
         /* Icon container */
@@ -321,14 +327,14 @@
 
         <div id="controls" class="hidden">
             <div class="settings-section">
-                <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance & Behavior</div>
+                <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance</div>
                 <div class="behavior-options">
                     <label title="High contrast mode: Background color fills the card">
                         <input type="checkbox" id="opt-full-color" onchange="toggleFullColor(this.checked)"> Full Color Background
                     </label>
-                    <label title="If checked, clicking an event removes it completely instead of turning grey">
-                        <input type="checkbox" id="opt-delete-on-click" onchange="savePref('delOnClick', this.checked)"> Delete on Click
-                    </label>
+                </div>
+                <div style="margin-top: 8px; font-style: italic; color: var(--text-muted);">
+                    Tip: Right-click an event to delete it instantly.
                 </div>
             </div>
 
@@ -356,7 +362,7 @@
         let recentSingleGifter = null;
         let bombTimeout = null;
         
-        // De-duplication set (for resubs)
+        // De-duplication set
         const handledEvents = new Set();
 
         // Authentication
@@ -403,6 +409,8 @@
                 
                 fetchViewerCount();
                 setInterval(fetchViewerCount, 60000);
+                
+                setInterval(updateRelativeTimes, 60000);
 
             } catch (e) {
                 console.error("Login failed:", e);
@@ -442,7 +450,6 @@
                     subscribeToEvents(); 
                 }
                 else if (data.metadata.message_type === 'notification') {
-                    // Unique ID check to prevent duplicate messages if websocket resends
                     const msgId = data.metadata.message_id;
                     if (handledEvents.has(msgId)) return;
                     handledEvents.add(msgId);
@@ -500,7 +507,7 @@
             } 
             else if (subType === 'channel.subscribe') {
                 if (event.is_gift) {
-                    if (activeBombWindow) return; // Suppress spam
+                    if (activeBombWindow) return;
                     
                     let gifterName = recentSingleGifter || 'Anonymous Gifter'; 
                     if (recentSingleGifter) {
@@ -511,8 +518,6 @@
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                     data = { type: 'giftsub', user: gifterName, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
                 } else {
-                    // Check for duplicate resub
-                    // Key by user_id in the case of getting 'subscribe' and 'message' for the same user
                     if (handledEvents.has(event.user_id + '_resub')) return;
                     
                     handledEvents.add(event.user_id + '_resub');
@@ -523,7 +528,6 @@
                 }
             } 
             else if (subType === 'channel.subscription.message') {
-                // Add to dedupe list so channel.subscribe doesn't double fire if it arrives second
                 if (!handledEvents.has(event.user_id + '_resub')) {
                     handledEvents.add(event.user_id + '_resub');
                     setTimeout(() => handledEvents.delete(event.user_id + '_resub'), 10000);
@@ -552,7 +556,7 @@
                     data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
                 } else {
                     recentSingleGifter = gifter;
-                    setTimeout(() => { recentSingleGifter = null; }, 1000); // 1s timeout, increase if non-anon gifts continue to be mistaken as anon gifts
+                    setTimeout(() => { recentSingleGifter = null; }, 1000); 
                     return; 
                 }
             } 
@@ -594,6 +598,29 @@
             }
 
             if (data) addEventToFeed(data);
+        }
+
+        // Relative time logic
+        function getRelativeTime(timestamp) {
+            const now = new Date();
+            const then = new Date(parseInt(timestamp));
+            const diffInSeconds = Math.floor((now - then) / 1000);
+
+            if (diffInSeconds < 60) return 'Just now';
+            const minutes = Math.floor(diffInSeconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            return `${hours}h ago`;
+        }
+
+        function updateRelativeTimes() {
+            const timestamps = document.querySelectorAll('.timestamp');
+            timestamps.forEach(el => {
+                const rawTime = el.getAttribute('data-time');
+                if (rawTime) {
+                    el.innerText = getRelativeTime(rawTime);
+                }
+            });
         }
 
         // UI Logic
@@ -655,16 +682,16 @@
             const initialState = settings[data.type].highlight ? 'active' : 'acknowledged';
             el.className = `event-item ${data.type} ${initialState}`;
             
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const now = Date.now();
+            const relTime = getRelativeTime(now);
 
             let html = `
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 <div class="content">
-                    <div><span class="username">${data.user}</span><span class="timestamp">${time}</span></div>
+                    <div><span class="username">${data.user}</span><span class="timestamp" data-time="${now}">${relTime}</span></div>
                     <div class="message">${data.message}</div>
             `;
             
-            // Add chat message as sub-text to event (if available)
             if (data.chatMessage) {
                 html += `<div class="chat-message">"${data.chatMessage}"</div>`;
             }
@@ -672,24 +699,27 @@
             html += `</div>`;
             el.innerHTML = html;
 
-            el.onclick = () => {
-                const deleteOnClick = document.getElementById('opt-delete-on-click').checked;
-                if (deleteOnClick) {
-                    el.remove();
+            // Left click: toggle
+            el.onclick = (e) => {
+                if (el.classList.contains('active')) {
+                    el.classList.remove('active');
+                    el.classList.add('acknowledged');
                 } else {
-                    if (el.classList.contains('active')) {
-                        el.classList.remove('active');
-                        el.classList.add('acknowledged');
-                    }
+                    el.classList.remove('acknowledged');
+                    el.classList.add('active');
                 }
             };
+            
+            // Right click: delete
+            el.oncontextmenu = (e) => {
+                e.preventDefault();
+                el.remove();
+            };
+
             feed.prepend(el);
         }
 
         // Make preferences persist
-        if (localStorage.getItem('delOnClick') === 'true') {
-            document.getElementById('opt-delete-on-click').checked = true;
-        }
         if (localStorage.getItem('fullColor') === 'true') {
             document.getElementById('opt-full-color').checked = true;
             document.body.classList.add('style-full');
