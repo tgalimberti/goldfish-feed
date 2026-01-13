@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Goldfish Feed - UX Demo (Reflow Fix)</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐠</text></svg>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* --- STYLES (v0.13 - Reflow Fix) --- */
+        :root {
+            --bg-color: #18181b; 
+            --card-bg: #1f1f23;
+            --text-main: #efeff1;
+            --text-muted: #adadb8;
+            --border-radius: 4px;
+            
+            --color-follow: #ff4f8d;
+            --color-sub: #bf94ff;
+            --color-giftsub: #a970ff;
+            --color-cheer: #00dbdb;
+            --color-donation: #00fa9a;
+            --color-redeem: #f5da55;
+            --color-raid: #ff544f;
+            --color-poll: #00cefa;
+            --color-hypetrain: #ffb300;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            font-size: 13px;
+            user-select: none; 
+        }
+
+        #app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+        
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            border: 2px solid #9147ff;
+            background-color: #9147ff; 
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; color: white;
+        }
+        .header-right { display: flex; align-items: center; gap: 15px; }
+
+        .viewercount {
+            display: flex; align-items: center; gap: 6px;
+            color: #ff544f; font-weight: 700; font-size: 1.1rem;
+        }
+        
+        .app-title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.02em; }
+        .username-highlight { color: #9147ff; }
+
+        /* Demo Buttons */
+        .demo-btn {
+            background-color: #2c2c31; color: white; border: 1px solid #444;
+            padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .demo-btn:hover { background-color: #9147ff; border-color: #9147ff; }
+
+        #feed { 
+            display: flex; 
+            flex-direction: column; 
+            /* No gap here, we handle it in the item for smoother animation */
+        }
+
+        .event-item {
+            display: flex; 
+            align-items: flex-start; 
+            
+            background-color: transparent; 
+            border-left: 4px solid transparent;
+            cursor: pointer; 
+            border-radius: var(--border-radius);
+            position: relative;
+
+            /* --- ANIMATION BASE STATE --- */
+            /* Start collapsed, invisible, and with no spacing */
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin-bottom: 0;
+            overflow: hidden;
+
+            /* Transition duration: 0.8s */
+            transition: all 1.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* --- ANIMATION VISIBLE STATE --- */
+        .event-item.show {
+            max-height: 150px; /* Target height */
+            opacity: 1;
+            padding: 10px; /* Target padding */
+            margin-bottom: 2px; /* Target margin */
+        }
+
+        .icon-box { width: 20px; margin-right: 12px; display: flex; justify-content: center; font-size: 16px; margin-top: 1px; }
+        .content { display: flex; flex-direction: column; flex: 1; line-height: 1.4; }
+        .username { font-weight: 700; color: var(--text-main); }
+        .message { color: var(--text-muted); margin-top: 4px; font-style: italic; }
+        .chat-message { margin-top: 4px; color: var(--text-main); opacity: 0.9; word-break: break-word; }
+        .timestamp { color: var(--text-muted); font-size: 0.75rem; margin-left: 5px; }
+
+        /* Colors */
+        .event-item.follow.active-style { border-left-color: var(--color-follow); }
+        .event-item.follow.active-style .icon-box { color: var(--color-follow); }
+        
+        .event-item.sub.active-style { border-left-color: var(--color-sub); }
+        .event-item.sub.active-style .icon-box { color: var(--color-sub); }
+        
+        .event-item.giftsub.active-style { border-left-color: var(--color-giftsub); }
+        .event-item.giftsub.active-style .icon-box { color: var(--color-giftsub); }
+        
+        .event-item.cheer.active-style { border-left-color: var(--color-cheer); }
+        .event-item.cheer.active-style .icon-box { color: var(--color-cheer); }
+        
+        .event-item.redeem.active-style { border-left-color: var(--color-redeem); }
+        .event-item.redeem.active-style .icon-box { color: var(--color-redeem); }
+        
+        .event-item.raid.active-style { border-left-color: var(--color-raid); }
+        .event-item.raid.active-style .icon-box { color: var(--color-raid); }
+        
+        .event-item.poll.active-style { border-left-color: var(--color-poll); }
+        .event-item.poll.active-style .icon-box { color: var(--color-poll); }
+        
+        .event-item.hypetrain.active-style { border-left-color: var(--color-hypetrain); }
+        .event-item.hypetrain.active-style .icon-box { color: var(--color-hypetrain); }
+
+        /* Full highlight style */
+        body.style-full .event-item.active-style .username,
+        body.style-full .event-item.active-style .message, 
+        body.style-full .event-item.active-style .chat-message,
+        body.style-full .event-item.active-style .timestamp { color: #000 !important; opacity: 0.9; }
+        body.style-full .event-item.active-style .icon-box { color: #000 !important; }
+
+        body.style-full .event-item.follow.active-style { background-color: var(--color-follow); }
+        body.style-full .event-item.sub.active-style { background-color: var(--color-sub); }
+        body.style-full .event-item.giftsub.active-style { background-color: var(--color-giftsub); }
+        body.style-full .event-item.cheer.active-style { background-color: var(--color-cheer); }
+        body.style-full .event-item.redeem.active-style { background-color: var(--color-redeem); }
+        body.style-full .event-item.raid.active-style { background-color: var(--color-raid); }
+        body.style-full .event-item.poll.active-style { background-color: var(--color-poll); }
+        body.style-full .event-item.hypetrain.active-style { background-color: var(--color-hypetrain); }
+
+        .event-item.acknowledged { opacity: 0.5; border-left: 4px solid #333; background-color: transparent !important; }
+        .event-item.acknowledged .icon-box { color: #555 !important; }
+        
+    </style>
+</head>
+<body>
+
+    <div id="app-header">
+        <div class="header-left">
+            <div class="header-avatar">D</div>
+            <div class="app-title">Goldfish Feed <span id="header-username" class="username-highlight">Demo</span></div>
+        </div>
+        
+        <div class="header-right">
+            <div id="viewercount" class="viewercount">
+                <i class="fa-solid fa-user-group"></i>
+                <span>85</span>
+            </div>
+            <button class="demo-btn" onclick="document.body.classList.toggle('style-full')">Toggle Style</button>
+            <button class="demo-btn" onclick="runSimulation()">▶ Run Simulation</button>
+        </div>
+    </div>
+    
+    <div style="text-align: center; color: #adadb8; margin-bottom: 10px; font-style: italic;">
+        Left-click to Acknowledge • Right-click to Delete
+    </div>
+
+    <div id="feed"></div>
+
+    <script>
+        const icons = { 
+            follow: 'fa-solid fa-heart', 
+            sub: 'fa-solid fa-star', 
+            giftsub: 'fa-solid fa-gift', 
+            cheer: 'fa-solid fa-gem', 
+            redeem: 'fa-solid fa-ticket', 
+            raid: 'fa-solid fa-parachute-box',
+            poll: 'fa-solid fa-square-poll-vertical',
+            hypetrain: 'fa-solid fa-train'
+        };
+
+        function addEventToFeed(data) {
+            const feed = document.getElementById('feed');
+            const el = document.createElement('div');
+            
+            // We set 'active-style' immediately for colors, 
+            // but the geometry is handled by the .show class (not added yet)
+            el.className = `event-item ${data.type} active-style`; 
+            
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            let html = `
+                <div class="icon-box"><i class="${icons[data.type]}"></i></div>
+                <div class="content">
+                    <div><span class="username">${data.user}</span><span class="timestamp">Just now</span></div>
+                    <div class="message">${data.message}</div>
+            `;
+            
+            if (data.chatMessage) {
+                html += `<div class="chat-message">"${data.chatMessage}"</div>`;
+            }
+
+            html += `</div>`;
+            el.innerHTML = html;
+
+            // --- CLICK LOGIC ---
+            el.onclick = (e) => {
+                if (el.classList.contains('active-style')) {
+                    el.classList.remove('active-style');
+                    el.classList.add('acknowledged');
+                } else {
+                    el.classList.remove('acknowledged');
+                    el.classList.add('active-style');
+                }
+            };
+
+            el.oncontextmenu = (e) => {
+                e.preventDefault();
+                el.classList.remove('show'); 
+                setTimeout(() => el.remove(), 800); 
+            };
+
+            // --- ANIMATION LOGIC (FIXED) ---
+            
+            // 1. Insert element (Height: 0)
+            feed.prepend(el);
+            
+            // 2. FORCE REFLOW
+            // accessing offsetWidth forces the browser to calculate the current state (height: 0)
+            // before moving to the next line. This prevents the "instant jump" bug.
+            void el.offsetWidth; 
+
+            // 3. Trigger Animation
+            el.classList.add('show');
+        }
+
+        function runSimulation() {
+            document.getElementById('feed').innerHTML = '';
+            
+            const sequence = [
+                { delay: 500, type: 'follow', user: 'NewFan123', message: 'Followed you' },
+                { delay: 1500, type: 'cheer', user: 'BigSpender', message: 'Cheered 500 bits', chatMessage: 'Keep up the good vibes!' },
+                { delay: 3500, type: 'sub', user: 'LongTimeLurker', message: 'Subscribed (Tier 1)' },
+                { delay: 5500, type: 'redeem', user: 'ChatterBox', message: 'Redeemed Hydrate!' },
+                { delay: 7000, type: 'raid', user: 'FamousStreamer', message: 'Raided with 124 viewers' },
+            ];
+
+            sequence.forEach(event => {
+                setTimeout(() => {
+                    addEventToFeed(event);
+                }, event.delay);
+            });
+        }
+    </script>
+</body>
+</html>
