@@ -16,8 +16,9 @@ Goldfish Feed is a simple, browser-based activity feed for Twitch streamers who 
 - **Secure:** Your token never leaves your browser.
 
 ## To-do
-- Upgrade to PKCE flow (preventing unnecessary login each time)
-- Include donations via 3rd-parties like streamlabs and streamelements
+- [ ] Include donations via 3rd-parties like streamlabs and streamelements
+- [ ] Add test events 
 
 ## Limitations
 - Because this is a live feed, it doesn't show events that occurred *before* you open the link.
+- **PKCE:** Currently not supported for public clients by Twitch's API, so token expiry is dealt with using session persistence.

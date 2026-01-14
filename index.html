@@ -6,6 +6,7 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐠</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+
         :root {
             --bg-color: #18181b; 
             --card-bg: #1f1f23;
@@ -31,6 +32,7 @@
             margin: 0;
             padding: 20px;
             font-size: 13px;
+            user-select: none; 
         }
 
         #login-screen {
@@ -77,37 +79,26 @@
 
         .viewercount {
             display: flex; align-items: center; gap: 6px;
-            color: #ff544f; 
-            font-weight: 700;
-            font-size: 1.1rem;
+            color: #ff544f; font-weight: 700; font-size: 1.1rem;
             display: none; 
         }
         
         .app-title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.02em; }
         .username-highlight { color: #9147ff; }
-        
+
         .settings-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: color 0.2s;
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 1.2rem; transition: color 0.2s;
         }
         .settings-btn:hover { color: var(--text-main); }
 
         #controls {
-            background: var(--card-bg);
-            padding: 10px 15px;
-            border-radius: var(--border-radius);
-            margin-bottom: 20px;
-            border: 1px solid #333;
+            background: var(--card-bg); padding: 10px 15px;
+            border-radius: var(--border-radius); margin-bottom: 20px; border: 1px solid #333;
         }
 
         .settings-section {
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #333;
+            margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333;
         }
         .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
@@ -123,37 +114,25 @@
         
         input[type="checkbox"] { accent-color: #9147ff; cursor: pointer; }
 
-        #feed { 
-            display: flex; 
-            flex-direction: column; 
+        #feed { display: flex; flex-direction: column; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .event-item {
-            display: flex; align-items: flex-start; 
+            display: flex; align-items: flex-start; padding: 10px;
+            background-color: transparent; border-left: 4px solid transparent;
+            cursor: pointer; position: relative; border-radius: var(--border-radius);
             
-            background-color: transparent; 
-            border-left: 4px solid transparent;
-            cursor: pointer; 
-            position: relative;
-            border-radius: var(--border-radius);
-
-            /* Animation base state */
-            max-height: 0;
-            opacity: 0;
-            padding-top: 0;
-            padding-bottom: 0;
-            margin-bottom: 0;
-            overflow: hidden;
-
+            /* Animation Base State */
+            max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; margin-bottom: 0; overflow: hidden;
             transition: all 1.0s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
-        /* Animation visible state */
         .event-item.show {
-            max-height: 150px;
-            opacity: 1;
-            padding: 10px;
-            margin-bottom: 2px;
+            max-height: 150px; opacity: 1; padding: 10px; margin-bottom: 2px;
         }
 
         .icon-box { width: 20px; margin-right: 12px; display: flex; justify-content: center; font-size: 16px; margin-top: 1px; }
@@ -222,14 +201,14 @@
             </div>
             
             <div class="header-right">
-                <div id="viewercount" class="viewercount">
+                <div id="viewercount" class="viewercount" title="Live Viewers">
                     <i class="fa-solid fa-user-group"></i>
                     <span id="viewer-number">0</span>
                 </div>
                 <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
             </div>
         </div>
-        
+
         <div id="controls" class="hidden">
             <div class="settings-section">
                 <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance</div>
@@ -266,9 +245,41 @@
         let activeBombWindow = false;
         let recentSingleGifter = null;
         let bombTimeout = null;
-        
-        // De-duplication set
         const handledEvents = new Set();
+
+        // Session persistence logic
+        function saveSession() {
+            const items = [];
+            document.querySelectorAll('.event-item').forEach(el => {
+                if (el.dataset.raw) {
+                    items.push({
+                        data: JSON.parse(el.dataset.raw),
+                        acknowledged: el.classList.contains('acknowledged'),
+                        timestamp: el.querySelector('.timestamp').getAttribute('data-time')
+                    });
+                }
+            });
+            localStorage.setItem('feed_session', JSON.stringify(items.reverse()));
+        }
+
+        function restoreSession() {
+            const saved = localStorage.getItem('feed_session');
+            if (saved) {
+                const items = JSON.parse(saved);
+                items.forEach(item => {
+                    addEventToFeed(item.data, item.acknowledged, item.timestamp);
+                });
+                // Clear after restoring to avoid dupes on reload
+                localStorage.removeItem('feed_session');
+            }
+        }
+
+        function handleTokenExpiry() {
+            console.log("Token expired. Saving state and reloading...");
+            saveSession();
+            // Redirect to auth to get new token immediately
+            authorize(); 
+        }
 
         // Authentication
         function authorize() {
@@ -293,14 +304,22 @@
 
         async function init() {
             try {
+                // Attempt to load saved session immediately
+                restoreSession();
+
                 const userRes = await fetch('https://api.twitch.tv/helix/users', {
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
                 });
+                
+                if (userRes.status === 401) {
+                    handleTokenExpiry();
+                    return;
+                }
+
                 const userData = await userRes.json();
                 const user = userData.data[0];
                 userId = user.id;
                 
-                // Update header
                 document.getElementById('header-username').innerText = "for " + user.display_name;
                 if (user.profile_image_url) {
                     const img = document.getElementById('user-avatar');
@@ -314,7 +333,6 @@
                 
                 fetchViewerCount();
                 setInterval(fetchViewerCount, 60000);
-                
                 setInterval(updateRelativeTimes, 60000);
 
             } catch (e) {
@@ -329,6 +347,12 @@
                 const res = await fetch(`https://api.twitch.tv/helix/streams?user_id=${userId}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
                 });
+                
+                if (res.status === 401) {
+                    handleTokenExpiry();
+                    return;
+                }
+
                 const data = await res.json();
                 const viewEl = document.getElementById('viewercount');
                 
@@ -377,8 +401,6 @@
                 { type: 'channel.raid', version: '1', condition: { to_broadcaster_user_id: userId } },
                 { type: 'channel.poll.begin', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.poll.end', version: '1', condition: { broadcaster_user_id: userId } },
-                
-                // Updated Hype Train to Version 2
                 { type: 'channel.hype_train.begin', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.progress', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.end', version: '2', condition: { broadcaster_user_id: userId } }
@@ -507,7 +529,6 @@
             if (data) addEventToFeed(data);
         }
 
-        // Relative time logic
         function getRelativeTime(timestamp) {
             const now = new Date();
             const then = new Date(parseInt(timestamp));
@@ -530,7 +551,6 @@
             });
         }
 
-        // UI Logic
         const feed = document.getElementById('feed');
         const togglesContainer = document.getElementById('toggles-container');
         const controls = document.getElementById('controls');
@@ -542,7 +562,6 @@
             savePref('fullColor', checked);
         }
 
-        // Setup UI
         const settings = {};
         const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain'];
         
@@ -582,15 +601,21 @@
 
         function toggle(t, s, v) { settings[t][s] = v; }
 
-        function addEventToFeed(data) {
+        // Modified to support restoring state
+        function addEventToFeed(data, forceAck = false, forceTime = null) {
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
-            // If highlight is OFF, we start as 'acknowledged', otherwise 'active'
-            const initialState = settings[data.type].highlight ? 'active' : 'acknowledged';
+            // Save raw data for persistence
+            el.dataset.raw = JSON.stringify(data);
+            
+            const initialState = forceAck 
+                ? 'acknowledged' 
+                : (settings[data.type].highlight ? 'active' : 'acknowledged');
+            
             el.className = `event-item ${data.type} ${initialState}`;
             
-            const now = Date.now();
+            const now = forceTime ? parseInt(forceTime) : Date.now();
             const relTime = getRelativeTime(now);
 
             let html = `
@@ -607,8 +632,9 @@
             html += `</div>`;
             el.innerHTML = html;
 
-            // Left click: toggle
             el.onclick = (e) => {
+                if (e.target.closest('.delete-btn')) return;
+
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
                     el.classList.add('acknowledged');
@@ -616,19 +642,23 @@
                     el.classList.remove('acknowledged');
                     el.classList.add('active');
                 }
+                // Save state on any interaction
+                saveSession();
             };
             
-            // Right click: delete
             el.oncontextmenu = (e) => {
                 e.preventDefault();
-                el.classList.remove('show'); 
-                setTimeout(() => el.remove(), 1000); 
+                el.remove();
+                saveSession();
             };
 
-            // Animation Logic
             feed.prepend(el);
+            
             void el.offsetWidth; 
             el.classList.add('show');
+            
+            // Save state when new item arrives
+            if (!forceTime) saveSession();
         }
 
         // Make preferences persist
