@@ -6,7 +6,6 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐠</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-
         :root {
             --bg-color: #18181b; 
             --card-bg: #1f1f23;
@@ -32,7 +31,6 @@
             margin: 0;
             padding: 20px;
             font-size: 13px;
-            user-select: none; 
         }
 
         #login-screen {
@@ -79,26 +77,37 @@
 
         .viewercount {
             display: flex; align-items: center; gap: 6px;
-            color: #ff544f; font-weight: 700; font-size: 1.1rem;
+            color: #ff544f; 
+            font-weight: 700;
+            font-size: 1.1rem;
             display: none; 
         }
         
         .app-title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.02em; }
         .username-highlight { color: #9147ff; }
-
+        
         .settings-btn {
-            background: none; border: none; color: var(--text-muted);
-            cursor: pointer; font-size: 1.2rem; transition: color 0.2s;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: color 0.2s;
         }
         .settings-btn:hover { color: var(--text-main); }
 
         #controls {
-            background: var(--card-bg); padding: 10px 15px;
-            border-radius: var(--border-radius); margin-bottom: 20px; border: 1px solid #333;
+            background: var(--card-bg);
+            padding: 10px 15px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            border: 1px solid #333;
         }
 
         .settings-section {
-            margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #333;
         }
         .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
@@ -245,7 +254,9 @@
         let activeBombWindow = false;
         let recentSingleGifter = null;
         let bombTimeout = null;
-        const handledEvents = new Set();
+        
+        // Map to store pending subscription timeouts (User ID -> Timeout ID)
+        const pendingSubscribes = new Map();
 
         // Session persistence logic
         function saveSession() {
@@ -269,7 +280,6 @@
                 items.forEach(item => {
                     addEventToFeed(item.data, item.acknowledged, item.timestamp);
                 });
-                // Clear after restoring to avoid dupes on reload
                 localStorage.removeItem('feed_session');
             }
         }
@@ -277,7 +287,6 @@
         function handleTokenExpiry() {
             console.log("Token expired. Saving state and reloading...");
             saveSession();
-            // Redirect to auth to get new token immediately
             authorize(); 
         }
 
@@ -299,15 +308,14 @@
                 document.getElementById('app-content').classList.remove('hidden');
                 
                 init();
-            }
-            else if (localStorage.getItem('feed_session")) {
+            } else if (localStorage.getItem('feed_session')) {
+                // Auto-reconnect if session found
                 authorize();
             }
         }
 
         async function init() {
             try {
-                // Attempt to load saved session immediately
                 restoreSession();
 
                 const userRes = await fetch('https://api.twitch.tv/helix/users', {
@@ -382,11 +390,6 @@
                     subscribeToEvents(); 
                 }
                 else if (data.metadata.message_type === 'notification') {
-                    const msgId = data.metadata.message_id;
-                    if (handledEvents.has(msgId)) return;
-                    handledEvents.add(msgId);
-                    setTimeout(() => handledEvents.delete(msgId), 60000); 
-                    
                     handleNotification(data.payload);
                 }
             };
@@ -439,7 +442,7 @@
             } 
             else if (subType === 'channel.subscribe') {
                 if (event.is_gift) {
-                    if (activeBombWindow) return;
+                    if (activeBombWindow) return; // Suppress spam if bomb active
                     
                     let gifterName = recentSingleGifter || 'Anonymous Gifter'; 
                     if (recentSingleGifter) {
@@ -450,19 +453,25 @@
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
                     data = { type: 'giftsub', user: gifterName, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
                 } else {
-                    if (handledEvents.has(event.user_id + '_resub')) return;
+                    // Pending buffer logic
                     
-                    handledEvents.add(event.user_id + '_resub');
-                    setTimeout(() => handledEvents.delete(event.user_id + '_resub'), 10000);
-
                     const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                    data = { type: 'sub', user: event.user_name, message: `Subscribed (Tier ${tier})` };
+                    const subData = { type: 'sub', user: event.user_name, message: `Subscribed (Tier ${tier})` };
+                    
+                    const timeoutId = setTimeout(() => {
+                        addEventToFeed(subData);
+                        pendingSubscribes.delete(event.user_id);
+                    }, 3000);
+
+                    pendingSubscribes.set(event.user_id, timeoutId);
+                    return; 
                 }
             } 
             else if (subType === 'channel.subscription.message') {
-                if (!handledEvents.has(event.user_id + '_resub')) {
-                    handledEvents.add(event.user_id + '_resub');
-                    setTimeout(() => handledEvents.delete(event.user_id + '_resub'), 10000);
+                // If we have a pending generic sub for this user, kill it
+                if (pendingSubscribes.has(event.user_id)) {
+                    clearTimeout(pendingSubscribes.get(event.user_id));
+                    pendingSubscribes.delete(event.user_id);
                 }
 
                 const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
@@ -488,7 +497,7 @@
                     data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
                 } else {
                     recentSingleGifter = gifter;
-                    setTimeout(() => { recentSingleGifter = null; }, 1000); 
+                    setTimeout(() => { recentSingleGifter = null; }, 5000); 
                     return; 
                 }
             } 
@@ -502,7 +511,12 @@
                 };
             } 
             else if (subType === 'channel.channel_points_custom_reward_redemption.add') {
-                data = { type: 'redeem', user: event.user_name, message: `Redeemed ${event.reward.title}` };
+                data = { 
+                    type: 'redeem', 
+                    user: event.user_name, 
+                    message: `Redeemed ${event.reward.title}`,
+                    chatMessage: event.user_input
+                };
             }
             else if (subType === 'channel.raid') {
                 data = { type: 'raid', user: event.from_broadcaster_user_name, message: `Raided with ${event.viewers} viewers` };
@@ -532,6 +546,7 @@
             if (data) addEventToFeed(data);
         }
 
+        // Relative time logic
         function getRelativeTime(timestamp) {
             const now = new Date();
             const then = new Date(parseInt(timestamp));
@@ -554,6 +569,7 @@
             });
         }
 
+        // UI Logic
         const feed = document.getElementById('feed');
         const togglesContainer = document.getElementById('toggles-container');
         const controls = document.getElementById('controls');
@@ -565,6 +581,7 @@
             savePref('fullColor', checked);
         }
 
+        // Setup UI
         const settings = {};
         const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain'];
         
@@ -604,12 +621,10 @@
 
         function toggle(t, s, v) { settings[t][s] = v; }
 
-        // Modified to support restoring state
         function addEventToFeed(data, forceAck = false, forceTime = null) {
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
-            // Save raw data for persistence
             el.dataset.raw = JSON.stringify(data);
             
             const initialState = forceAck 
@@ -645,7 +660,6 @@
                     el.classList.remove('acknowledged');
                     el.classList.add('active');
                 }
-                // Save state on any interaction
                 saveSession();
             };
             
@@ -660,11 +674,9 @@
             void el.offsetWidth; 
             el.classList.add('show');
             
-            // Save state when new item arrives
             if (!forceTime) saveSession();
         }
 
-        // Make preferences persist
         if (localStorage.getItem('fullColor') === 'true') {
             document.getElementById('opt-full-color').checked = true;
             document.body.classList.add('style-full');
