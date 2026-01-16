@@ -300,6 +300,9 @@
                 
                 init();
             }
+            else if (localStorage.getItem('feed_session")) {
+                authorize();
+            }
         }
 
         async function init() {
