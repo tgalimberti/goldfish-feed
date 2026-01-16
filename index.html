@@ -31,6 +31,7 @@
             margin: 0;
             padding: 20px;
             font-size: 13px;
+            user-select: none; 
         }
 
         #login-screen {
@@ -76,7 +77,9 @@
         .header-right { display: flex; align-items: center; gap: 15px; }
 
         .viewercount {
-            display: flex; align-items: center; gap: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
             color: #ff544f; 
             font-weight: 700;
             font-size: 1.1rem;
@@ -85,29 +88,20 @@
         
         .app-title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.02em; }
         .username-highlight { color: #9147ff; }
-        
+
         .settings-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: color 0.2s;
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 1.2rem; transition: color 0.2s;
         }
         .settings-btn:hover { color: var(--text-main); }
 
         #controls {
-            background: var(--card-bg);
-            padding: 10px 15px;
-            border-radius: var(--border-radius);
-            margin-bottom: 20px;
-            border: 1px solid #333;
+            background: var(--card-bg); padding: 10px 15px;
+            border-radius: var(--border-radius); margin-bottom: 20px; border: 1px solid #333;
         }
 
         .settings-section {
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #333;
+            margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333;
         }
         .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
 
@@ -625,6 +619,7 @@
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
+            // Save raw data for persistence
             el.dataset.raw = JSON.stringify(data);
             
             const initialState = forceAck 
@@ -660,6 +655,7 @@
                     el.classList.remove('acknowledged');
                     el.classList.add('active');
                 }
+                // Save state on any interaction
                 saveSession();
             };
             
@@ -674,9 +670,11 @@
             void el.offsetWidth; 
             el.classList.add('show');
             
+            // Save state when new item arrives
             if (!forceTime) saveSession();
         }
 
+        // Make preferences persist
         if (localStorage.getItem('fullColor') === 'true') {
             document.getElementById('opt-full-color').checked = true;
             document.body.classList.add('style-full');
