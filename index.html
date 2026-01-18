@@ -77,9 +77,7 @@
         .header-right { display: flex; align-items: center; gap: 15px; }
 
         .viewercount {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            display: flex; align-items: center; gap: 6px;
             color: #ff544f; 
             font-weight: 700;
             font-size: 1.1rem;
@@ -244,14 +242,6 @@
         let sessionId = null;
         let currentHypeLevel = 0; 
         
-        // Logic states
-        let activeBombWindow = false;
-        let recentSingleGifter = null;
-        let bombTimeout = null;
-        
-        // Map to store pending subscription timeouts (User ID -> Timeout ID)
-        const pendingSubscribes = new Map();
-
         // Session persistence logic
         function saveSession() {
             const items = [];
@@ -286,7 +276,8 @@
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train';
+            // ADDED: user:read:chat scope
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -303,7 +294,6 @@
                 
                 init();
             } else if (localStorage.getItem('feed_session')) {
-                // Auto-reconnect if session found
                 authorize();
             }
         }
@@ -393,17 +383,19 @@
         async function subscribeToEvents() {
             const subs = [
                 { type: 'channel.follow', version: '2', condition: { broadcaster_user_id: userId, moderator_user_id: userId } },
-                { type: 'channel.subscribe', version: '1', condition: { broadcaster_user_id: userId } },
-                { type: 'channel.subscription.message', version: '1', condition: { broadcaster_user_id: userId } },
-                { type: 'channel.subscription.gift', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.cheer', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } },
-                { type: 'channel.raid', version: '1', condition: { to_broadcaster_user_id: userId } },
                 { type: 'channel.poll.begin', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.poll.end', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.begin', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.progress', version: '2', condition: { broadcaster_user_id: userId } },
-                { type: 'channel.hype_train.end', version: '2', condition: { broadcaster_user_id: userId } }
+                { type: 'channel.hype_train.end', version: '2', condition: { broadcaster_user_id: userId } },
+                
+                { 
+                    type: 'channel.chat.notification', 
+                    version: '1', 
+                    condition: { broadcaster_user_id: userId, user_id: userId } 
+                }
             ];
 
             for (const sub of subs) {
@@ -428,74 +420,73 @@
         // Handle events
         function handleNotification(payload) {
             const event = payload.event;
-            const subType = payload.subscription.type;
+            const type = payload.subscription.type;
             let data = null;
 
-            if (subType === 'channel.follow') {
-                data = { type: 'follow', user: event.user_name, message: 'Followed you' };
-            } 
-            else if (subType === 'channel.subscribe') {
-                if (event.is_gift) {
-                    if (activeBombWindow) return; // Suppress spam if bomb active
-                    
-                    let gifterName = recentSingleGifter || 'Anonymous Gifter'; 
-                    if (recentSingleGifter) {
-                        gifterName = recentSingleGifter;
-                        recentSingleGifter = null;
-                    }
-
-                    const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                    data = { type: 'giftsub', user: gifterName, message: `Gifted a Tier ${tier} Sub to ${event.user_name}` };
-                } else {
-                    // Pending buffer logic
-                    
-                    const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                    const subData = { type: 'sub', user: event.user_name, message: `Subscribed (Tier ${tier})` };
-                    
-                    const timeoutId = setTimeout(() => {
-                        addEventToFeed(subData);
-                        pendingSubscribes.delete(event.user_id);
-                    }, 3000);
-
-                    pendingSubscribes.set(event.user_id, timeoutId);
-                    return; 
-                }
-            } 
-            else if (subType === 'channel.subscription.message') {
-                // If we have a pending generic sub for this user, kill it
-                if (pendingSubscribes.has(event.user_id)) {
-                    clearTimeout(pendingSubscribes.get(event.user_id));
-                    pendingSubscribes.delete(event.user_id);
-                }
-
-                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-                const text = event.message ? event.message.text : '';
+            if (type === 'channel.chat.notification') {
+                const noticeType = event.notice_type;
+                const sub = event.sub;
+                const resub = event.resub;
+                const subGift = event.sub_gift;
+                const communityGift = event.community_sub_gift;
+                const raid = event.raid;
                 
-                data = { 
-                    type: 'sub', 
-                    user: event.user_name, 
-                    message: `Resubscribed for ${event.cumulative_months} months (Tier ${tier})`,
-                    chatMessage: text
-                };
-            }
-            else if (subType === 'channel.subscription.gift') {
-                const count = event.total;
-                const gifter = event.is_anonymous ? 'Anonymous' : event.user_name;
-                const tier = event.tier === "1000" ? "1" : (event.tier === "2000" ? "2" : "3");
-
-                if (count > 1) {
-                    activeBombWindow = true;
-                    if (bombTimeout) clearTimeout(bombTimeout);
-                    bombTimeout = setTimeout(() => { activeBombWindow = false; }, 5000); 
+                if (noticeType === 'sub') {
+                    const plan = sub.sub_plan;
+                    const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
+                    
+                    if (sub.is_prime || plan === "Prime") {
+                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed with Prime` };
+                    } else {
+                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed (Tier ${tier})` };
+                    }
+                }
+                else if (noticeType === 'resub') {
+                    const plan = resub.sub_plan;
+                    const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
+                    const months = resub.cumulative_months;
+                    
+                    let msgText = `Resubscribed for ${months} months (Tier ${tier})`;
+                    if (resub.is_prime || plan === "Prime") {
+                        msgText = `Resubscribed for ${months} months with Prime`;
+                    }
+                    
+                    data = { 
+                        type: 'sub', 
+                        user: event.chatter_user_name, 
+                        message: msgText,
+                        chatMessage: event.message?.text 
+                    };
+                }
+                else if (noticeType === 'sub_gift') {
+                    if (!subGift.community_gift_id) {
+                         const plan = subGift.sub_plan;
+                         const tier = plan === "2000" ? "2" : (plan === "3000" ? "3" : "1");
+                         const recipient = subGift.recipient_user_name;
+                         const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
+                         
+                         data = { type: 'giftsub', user: gifter, message: `Gifted a Tier ${tier} Sub to ${recipient}` };
+                    }
+                }
+                else if (noticeType === 'community_sub_gift') {
+                    const count = communityGift.total;
+                    const plan = communityGift.sub_plan;
+                    const tier = plan === "2000" ? "2" : (plan === "3000" ? "3" : "1");
+                    const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
                     
                     data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
-                } else {
-                    recentSingleGifter = gifter;
-                    setTimeout(() => { recentSingleGifter = null; }, 5000); 
-                    return; 
                 }
+                else if (noticeType === 'raid') {
+                    // Raid
+                    const viewerCount = raid.viewer_count;
+                    data = { type: 'raid', user: event.chatter_user_name, message: `Raided with ${viewerCount} viewers` };
+                }
+            }
+
+            else if (type === 'channel.follow') {
+                data = { type: 'follow', user: event.user_name, message: 'Followed you' };
             } 
-            else if (subType === 'channel.cheer') {
+            else if (type === 'channel.cheer') {
                 const user = event.is_anonymous ? 'Anonymous' : event.user_name;
                 data = { 
                     type: 'cheer', 
@@ -504,7 +495,7 @@
                     chatMessage: event.message 
                 };
             } 
-            else if (subType === 'channel.channel_points_custom_reward_redemption.add') {
+            else if (type === 'channel.channel_points_custom_reward_redemption.add') {
                 data = { 
                     type: 'redeem', 
                     user: event.user_name, 
@@ -512,27 +503,24 @@
                     chatMessage: event.user_input
                 };
             }
-            else if (subType === 'channel.raid') {
-                data = { type: 'raid', user: event.from_broadcaster_user_name, message: `Raided with ${event.viewers} viewers` };
-            }
-            else if (subType === 'channel.poll.begin') {
+            else if (type === 'channel.poll.begin') {
                 data = { type: 'poll', user: 'Poll Started', message: event.title };
             }
-            else if (subType === 'channel.poll.end') {
+            else if (type === 'channel.poll.end') {
                 const winner = event.choices.reduce((max, choice) => max.votes > choice.votes ? max : choice);
                 data = { type: 'poll', user: 'Poll Ended', message: `Winner: ${winner.title} (${winner.votes} votes)` };
             }
-            else if (subType === 'channel.hype_train.begin') {
+            else if (type === 'channel.hype_train.begin') {
                 currentHypeLevel = 1;
                 data = { type: 'hypetrain', user: 'Hype Train', message: 'Hype Train has started!' };
             }
-            else if (subType === 'channel.hype_train.progress') {
+            else if (type === 'channel.hype_train.progress') {
                 if (event.level > currentHypeLevel) {
                     currentHypeLevel = event.level;
                     data = { type: 'hypetrain', user: 'Hype Train', message: `Reached Level ${event.level}!` };
                 }
             }
-            else if (subType === 'channel.hype_train.end') {
+            else if (type === 'channel.hype_train.end') {
                 currentHypeLevel = 0; 
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
             }
@@ -619,7 +607,6 @@
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
-            // Save raw data for persistence
             el.dataset.raw = JSON.stringify(data);
             
             const initialState = forceAck 
@@ -655,7 +642,6 @@
                     el.classList.remove('acknowledged');
                     el.classList.add('active');
                 }
-                // Save state on any interaction
                 saveSession();
             };
             
@@ -670,11 +656,9 @@
             void el.offsetWidth; 
             el.classList.add('show');
             
-            // Save state when new item arrives
             if (!forceTime) saveSession();
         }
 
-        // Make preferences persist
         if (localStorage.getItem('fullColor') === 'true') {
             document.getElementById('opt-full-color').checked = true;
             document.body.classList.add('style-full');
