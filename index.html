@@ -418,7 +418,7 @@
         }
 
         // Handle events
-        function handleNotification(payload) {
+function handleNotification(payload) {
             const event = payload.event;
             const type = payload.subscription.type;
             let data = null;
@@ -473,8 +473,14 @@
                     const plan = communityGift.sub_plan;
                     const tier = plan === "2000" ? "2" : (plan === "3000" ? "3" : "1");
                     const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
+                    const cumulative = communityGift.cumulative_total;
                     
-                    data = { type: 'giftsub', user: gifter, message: `Gifted ${count} Tier ${tier} Subs` };
+                    let msg = `Gifted ${count} Tier ${tier} Subs`;
+                    if (cumulative && cumulative > 0) {
+                        msg += ` (Total Given: ${cumulative})`;
+                    }
+                    
+                    data = { type: 'giftsub', user: gifter, message: msg };
                 }
                 else if (noticeType === 'raid') {
                     // Raid
@@ -527,7 +533,7 @@
 
             if (data) addEventToFeed(data);
         }
-
+        
         // Relative time logic
         function getRelativeTime(timestamp) {
             const now = new Date();
