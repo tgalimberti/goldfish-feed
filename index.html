@@ -77,7 +77,9 @@
         .header-right { display: flex; align-items: center; gap: 15px; }
 
         .viewercount {
-            display: flex; align-items: center; gap: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
             color: #ff544f; 
             font-weight: 700;
             font-size: 1.1rem;
@@ -276,7 +278,6 @@
 
         // Authentication
         function authorize() {
-            // ADDED: user:read:chat scope
             const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
@@ -418,7 +419,7 @@
         }
 
         // Handle events
-function handleNotification(payload) {
+        function handleNotification(payload) {
             const event = payload.event;
             const type = payload.subscription.type;
             let data = null;
@@ -430,6 +431,7 @@ function handleNotification(payload) {
                 const subGift = event.sub_gift;
                 const communityGift = event.community_sub_gift;
                 const raid = event.raid;
+                const payForward = event.pay_it_forward;
                 
                 if (noticeType === 'sub') {
                     const plan = sub.sub_plan;
@@ -482,8 +484,16 @@ function handleNotification(payload) {
                     
                     data = { type: 'giftsub', user: gifter, message: msg };
                 }
+                else if (noticeType === 'pay_it_forward') {
+                    const originalGifter = payForward.gifter_is_anonymous ? "Anonymous" : payForward.gifter_user_name;
+                    const recipient = payForward.recipient_user_name || "the community"; 
+                    data = { 
+                        type: 'giftsub', 
+                        user: event.chatter_user_name, 
+                        message: `Is Paying Forward a gift from ${originalGifter}!` 
+                    };
+                }
                 else if (noticeType === 'raid') {
-                    // Raid
                     const viewerCount = raid.viewer_count;
                     data = { type: 'raid', user: event.chatter_user_name, message: `Raided with ${viewerCount} viewers` };
                 }
@@ -533,7 +543,7 @@ function handleNotification(payload) {
 
             if (data) addEventToFeed(data);
         }
-        
+
         // Relative time logic
         function getRelativeTime(timestamp) {
             const now = new Date();
