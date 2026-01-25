@@ -497,6 +497,14 @@
                     const viewerCount = raid.viewer_count;
                     data = { type: 'raid', user: event.chatter_user_name, message: `Raided with ${viewerCount} viewers` };
                 }
+                else if (noticeType === 'announcement') {
+                    data = {
+                    type: 'announcment',
+                    user: event.chatter_user_name,
+                    message: 'Announcement',
+                    chatMessage: event.message.text
+                    };
+                }
             }
 
             else if (type === 'channel.follow') {
@@ -591,7 +599,8 @@
             redeem: 'fa-solid fa-ticket', 
             raid: 'fa-solid fa-parachute-box',
             poll: 'fa-solid fa-square-poll-vertical',
-            hypetrain: 'fa-solid fa-train'
+            hypetrain: 'fa-solid fa-train',
+            announcmement: 'fa-solid fa-bullhorn'
         };
         
         const colors = { 
@@ -602,7 +611,8 @@
             redeem: '#f5da55', 
             raid: '#ff544f',
             poll: '#00cefa',
-            hypetrain: '#ffb300'
+            hypetrain: '#ffb300',
+            announcement: 'ff544f'
         };
 
         types.forEach(type => {
