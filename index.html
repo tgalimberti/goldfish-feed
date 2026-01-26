@@ -278,7 +278,7 @@
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat';
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -391,6 +391,8 @@
                 { type: 'channel.hype_train.begin', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.progress', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.end', version: '2', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.shoutout.create', version: '1', condition: {broadcaster_user_id: userId, moderator_user_id: userId } },
+                { type: 'channel.shoutout.receive', version: '1', condition: {broadcaster_user_id: userId, moderator_user_id: userId } },
                 
                 { 
                     type: 'channel.chat.notification', 
@@ -549,6 +551,20 @@
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
             }
 
+            else if (type === 'channel.shoutout.create') {
+                data = { 
+                    type: 'shoutout', 
+                    user: event.to_broadcaster_user_name, 
+                    message: `You gave a Shoutout!` 
+                };
+            }
+            else if (type === 'channel.shoutout.receive') {
+                data = { 
+                    type: 'shoutout', 
+                    user: event.from_broadcaster_user_name, 
+                    message: `Gave you a Shoutout to (${event.viewer_count} viewers)` 
+                };
+            }
             if (data) addEventToFeed(data);
         }
 
@@ -600,7 +616,8 @@
             raid: 'fa-solid fa-parachute-box',
             poll: 'fa-solid fa-square-poll-vertical',
             hypetrain: 'fa-solid fa-train',
-            announcmement: 'fa-solid fa-bullhorn'
+            announcmement: 'fa-solid fa-triangle-exclamation',
+            shoutout: 'fa-solid fa-bullhorn'
         };
         
         const colors = { 
@@ -612,7 +629,8 @@
             raid: '#ff544f',
             poll: '#00cefa',
             hypetrain: '#ffb300',
-            announcement: 'ff544f'
+            announcement: 'ff544f',
+            shoutout: 'a970ff'
         };
 
         types.forEach(type => {
