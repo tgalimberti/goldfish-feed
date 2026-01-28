@@ -167,6 +167,8 @@
         .event-item.shoutout.active .icon-box { color: var(--color-giftsub); }
         .event-item.announcement.active { border-left-color: var(--color-raid); }
         .event-item.announcement.active .icon-box { color: var(--color-raid); }
+        .event-item.prediction.active { border-left-color: var(--color-poll); }
+        .event-item.prediction.active .icon-box { color: var(--color-poll); }
 
         .style-full .event-item.shoutout.active { background-color: var(--color-giftsub); }
         .style-full .event-item.announcement.active { background-color: var(--color-raid); }
@@ -285,7 +287,7 @@
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts';
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+channel:read:predictions';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -400,7 +402,8 @@
                 { type: 'channel.hype_train.end', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.shoutout.create', version: '1', condition: {broadcaster_user_id: userId, moderator_user_id: userId } },
                 { type: 'channel.shoutout.receive', version: '1', condition: {broadcaster_user_id: userId, moderator_user_id: userId } },
-                
+                { type: 'channel.prediction.begin', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.prediction.end', version: '1', condition: { broadcaster_user_id: userId } },
                 { 
                     type: 'channel.chat.notification', 
                     version: '1', 
@@ -628,7 +631,7 @@
 
         // Setup UI
         const settings = {};
-        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout'];
+        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction'];
         
         const icons = { 
             follow: 'fa-solid fa-heart', 
@@ -639,8 +642,9 @@
             raid: 'fa-solid fa-parachute-box',
             poll: 'fa-solid fa-square-poll-vertical',
             hypetrain: 'fa-solid fa-train',
-            announcmement: 'fa-solid fa-triangle-exclamation',
-            shoutout: 'fa-solid fa-bullhorn'
+            announcement: 'fa-solid fa-triangle-exclamation',
+            shoutout: 'fa-solid fa-bullhorn',
+            prediction: 'fa-solid fa-chart-pie'
         };
         
         const colors = { 
@@ -652,8 +656,9 @@
             raid: '#ff544f',
             poll: '#00cefa',
             hypetrain: '#ffb300',
-            announcement: 'ff544f',
-            shoutout: 'a970ff'
+            announcement: '#ff544f',
+            shoutout: '#a970ff',
+            prediction '#00cefa'
         };
 
         types.forEach(type => {
