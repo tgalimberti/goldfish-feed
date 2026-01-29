@@ -591,6 +591,17 @@
                     message: `Gave you a Shoutout to (${event.viewer_count} viewers)` 
                 };
             }
+            else if (type === 'channel.prediction.begin') {
+                data = { type: 'prediction', user: 'Prediction Started', message: event.title };
+            }
+            else if (type === 'channel.prediction.end') {
+                const winningId = event.winning_outcome_id;
+                const winner = event.outcomes.find(o => o.id === winningId);
+                const title = winner ? winner.title : 'N/A';
+                const points = winner ? winner.channel_points : 0;
+                
+                data = { type: 'prediction', user: 'Prediction Ended', message: `Winner: ${title} (${points} pts)` };
+            }
             if (data) addEventToFeed(data);
         }
 
@@ -658,7 +669,7 @@
             hypetrain: '#ffb300',
             announcement: '#ff544f',
             shoutout: '#a970ff',
-            prediction '#00cefa'
+            prediction: '#00cefa'
         };
 
         types.forEach(type => {
