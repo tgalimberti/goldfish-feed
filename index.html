@@ -446,7 +446,7 @@
                 const payForward = event.pay_it_forward;
                 
                 if (noticeType === 'sub') {
-                    const plan = sub.sub_plan;
+                    const plan = String(sub.sub_plan);
                     const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
                     
                     if (sub.is_prime || plan === "Prime") {
