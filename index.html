@@ -393,7 +393,7 @@
         async function subscribeToEvents() {
             const subs = [
                 { type: 'channel.follow', version: '2', condition: { broadcaster_user_id: userId, moderator_user_id: userId } },
-                { type: 'channel.cheer', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.bits.use', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.poll.begin', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.poll.end', version: '1', condition: { broadcaster_user_id: userId } },
@@ -537,16 +537,24 @@
 
             else if (type === 'channel.follow') {
                 data = { type: 'follow', user: event.user_name, message: 'Followed you' };
-            } 
-            else if (type === 'channel.cheer') {
-                const user = event.is_anonymous ? 'Anonymous' : event.user_name;
+            }
+            else if (type === 'channel.bits.use') {
+                const user = event.user_name || 'Anonymous';
+                let messageText = `Used ${event.bits} Bits`;
+                
+                if (event.power_up) {
+                    messageText = `Used Power-up: ${event.power_up.name || 'Unknown'} (${event.bits} bits)`;
+                } else {
+                    messageText = `Cheered ${event.bits} bits`;
+                }
+
                 data = { 
                     type: 'cheer', 
                     user: user, 
-                    message: `Cheered ${event.bits} bits`, 
-                    chatMessage: event.message 
+                    message: messageText, 
+                    chatMessage: event.message ? event.message.text : '' 
                 };
-            } 
+            }
             else if (type === 'channel.channel_points_custom_reward_redemption.add') {
                 data = { 
                     type: 'redeem', 
