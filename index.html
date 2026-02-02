@@ -169,7 +169,10 @@
         .event-item.announcement.active .icon-box { color: var(--color-raid); }
         .event-item.prediction.active { border-left-color: var(--color-poll); }
         .event-item.prediction.active .icon-box { color: var(--color-poll); }
+        .event-item.whisper.active { border-left-color: var(--color-raid); }
+        .event-item.whisper.active .icon-box { color: var(--color-raid); }
 
+        .style-full .event-item.whisper.active { background-color: var(--color-raid); }
         .style-full .event-item.shoutout.active { background-color: var(--color-giftsub); }
         .style-full .event-item.announcement.active { background-color: var(--color-raid); }
 
@@ -251,7 +254,8 @@
         let userId = null;
         let socket = null;
         let sessionId = null;
-        let currentHypeLevel = 0; 
+        let currentHypeLevel = 0;
+        let moderatorIds = new Set();
         
         // Session persistence logic
         function saveSession() {
@@ -287,7 +291,7 @@
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+channel:read:predictions';
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+channel:read:predictions+channel:read:goals+channel:read:ads+user:read:whispers+moderation:read';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -305,6 +309,22 @@
                 init();
             } else if (localStorage.getItem('feed_session')) {
                 authorize();
+            }
+        }
+
+        async function fetchModerators() {
+            if (!userId) return;
+            try {
+                const res = await fetch(`https://api.twitch.tv/helix/moderation/moderators?broadcaster_id=${userId}&first=100`, {
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
+                });
+                const data = await res.json();
+                if (data.data) {
+                    data.data.forEach(mod => moderatorIds.add(mod.user_id));
+                    console.log(`Loaded ${moderatorIds.size} moderators.`);
+                }
+            } catch (e) {
+                console.error("Failed to fetch moderators:", e);
             }
         }
 
@@ -333,6 +353,7 @@
                 }
 
                 console.log(`Logged in as: ${user.display_name}`);
+                await fetchModerators();
                 
                 connectTwitchWebSocket();
                 
@@ -404,6 +425,7 @@
                 { type: 'channel.shoutout.receive', version: '1', condition: {broadcaster_user_id: userId, moderator_user_id: userId } },
                 { type: 'channel.prediction.begin', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.prediction.end', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'user.whisper.message', version: '1', condition: { user_id: userId } },
                 { 
                     type: 'channel.chat.notification', 
                     version: '1', 
@@ -610,6 +632,15 @@
                 
                 data = { type: 'prediction', user: 'Prediction Ended', message: `Winner: ${title} (${points} pts)` };
             }
+            else if (type === 'user.whisper.message') {
+                if (moderatorIds.has(event.from_user_id)) {
+                    data = {
+                        type: 'whisper',
+                        user: `${event.from_user_name} (Mod)`,
+                        message: event.whisper.text
+                    };
+                }
+            }
             if (data) addEventToFeed(data);
         }
 
@@ -650,7 +681,7 @@
 
         // Setup UI
         const settings = {};
-        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction'];
+        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction', 'goal', 'adbreak', 'whisper'];
         
         const icons = { 
             follow: 'fa-solid fa-heart', 
@@ -663,7 +694,8 @@
             hypetrain: 'fa-solid fa-train',
             announcement: 'fa-solid fa-triangle-exclamation',
             shoutout: 'fa-solid fa-bullhorn',
-            prediction: 'fa-solid fa-chart-pie'
+            prediction: 'fa-solid fa-chart-pie',
+            whisper: 'fa-solid fa-comment-dots'
         };
         
         const colors = { 
@@ -677,7 +709,8 @@
             hypetrain: '#ffb300',
             announcement: '#ff544f',
             shoutout: '#a970ff',
-            prediction: '#00cefa'
+            prediction: '#00cefa',
+            whisper: '#ff544f'
         };
 
         types.forEach(type => {
