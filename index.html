@@ -405,9 +405,13 @@
                 alert("Login failed. Check console.");
             }
         }
-function authorizeStreamlabs() {
-            const scope = 'donations.read+socket.token';
-            const url = `https://streamlabs.com/api/v2.0/authorize?client_id=${SL_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scope}&state=streamlabs`;
+        function authorizeStreamlabs() {
+            // 1. HARDCODE your exact Redirect URI here to avoid mismatches
+            const fixedRedirect = 'https://tgalimberti.github.io/goldfish-feed/'; 
+
+            // 2. Use a SPACE instead of a PLUS for the scope
+            const scope = 'donations.read socket.token';
+            const url = `https://streamlabs.com/api/v2.0/authorize?client_id=${SL_CLIENT_ID}&redirect_uri=${fixedRedirect}&response_type=token&scope=${scope}&state=streamlabs`;
             window.location.href = url;
         }
 
