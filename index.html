@@ -5,6 +5,7 @@
     <title>Goldfish Feed 🐠</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐠</text></svg>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
             --bg-color: #18181b; 
@@ -57,6 +58,18 @@
         }
         .login-btn:hover { background-color: #772ce8; }
         .hidden { display: none !important; }
+        .sl-btn {
+            background-color: #31c3a2;
+            font-size: 0.9rem; 
+            padding: 8px 16px;
+            margin-top: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+        }
+        .sl-btn:hover { background-color: #2ba88d; }
+        .sl-btn:disabled { background-color: #2ea44f; cursor: default; opacity: 1; }
 
         #app-header {
             display: flex;
@@ -193,6 +206,7 @@
         .style-full .event-item.raid.active { background-color: var(--color-raid); }
         .style-full .event-item.poll.active { background-color: var(--color-poll); }
         .style-full .event-item.hypetrain.active { background-color: var(--color-hypetrain); }
+        .style-full .event-item.donation.active { background-color: var(--color-donation); }
 
         .event-item.acknowledged {
             opacity: 0.5; border-left: 4px solid #333; background-color: transparent !important;
@@ -226,6 +240,12 @@
 
         <div id="controls" class="hidden">
             <div class="settings-section">
+                <div class="control-header" style="color: #fff; margin-bottom: 8px;">Integrations</div>
+                <button id="btn-sl-connect" class="login-btn sl-btn" onclick="authorizeStreamlabs()">
+                    <i class="fa-solid fa-flask"></i> Connect Streamlabs
+                </button>
+            </div>
+            <div class="settings-section">
                 <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance</div>
                 <div class="behavior-options">
                     <label title="High contrast mode: Background color fills the card">
@@ -248,6 +268,7 @@
     <script>
         const CLIENT_ID = 'lt7p3t0i66py3xi742ekkpkw8d1xvk';
         const REDIRECT_URI = window.location.origin + window.location.pathname; 
+        const SL_CLIENT_ID = 'a1026535-1489-45b9-8a86-f298b5e869ac';
         
         // State
         let accessToken = null;
@@ -256,6 +277,9 @@
         let sessionId = null;
         let currentHypeLevel = 0;
         let moderatorIds = new Set();
+        let slAccessToken = null;
+        let slSocketToken = null;
+        let slSocket = null;
         
         // Session persistence logic
         function saveSession() {
@@ -298,14 +322,28 @@
 
         function checkAuth() {
             const hash = window.location.hash;
+            
+            // Handle Streamlabs Return
+            if (hash.includes('access_token') && hash.includes('state=streamlabs')) {
+                const params = new URLSearchParams(hash.substring(1));
+                const token = params.get('access_token');
+                localStorage.setItem('sl_access_token', token);
+                
+                // Clear URL and reload to clean up
+                window.history.replaceState({}, document.title, window.location.pathname);
+                window.location.reload();
+                return;
+            }
+
+            // Handle Twitch Return
             if (hash.includes('access_token')) {
                 const params = new URLSearchParams(hash.substring(1));
                 accessToken = params.get('access_token');
                 window.history.replaceState({}, document.title, window.location.pathname);
-                
+
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('app-content').classList.remove('hidden');
-                
+
                 init();
             } else if (localStorage.getItem('feed_session')) {
                 authorize();
@@ -356,6 +394,7 @@
                 await fetchModerators();
                 
                 connectTwitchWebSocket();
+                initStreamlabs();
                 
                 fetchViewerCount();
                 setInterval(fetchViewerCount, 60000);
@@ -365,6 +404,62 @@
                 console.error("Login failed:", e);
                 alert("Login failed. Check console.");
             }
+        }
+function authorizeStreamlabs() {
+            const scope = 'donations.read+socket.token';
+            const url = `https://streamlabs.com/api/v2.0/authorize?client_id=${SL_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scope}&state=streamlabs`;
+            window.location.href = url;
+        }
+
+        async function initStreamlabs() {
+            const savedToken = localStorage.getItem('sl_access_token');
+            if (savedToken) {
+                slAccessToken = savedToken;
+                const btn = document.getElementById('btn-sl-connect');
+                if (btn) {
+                    btn.innerText = "Streamlabs Connected";
+                    btn.disabled = true;
+                }
+                await fetchStreamlabsSocketToken();
+            }
+        }
+
+        async function fetchStreamlabsSocketToken() {
+            try {
+                const res = await fetch('https://streamlabs.com/api/v2.0/socket/token', {
+                    headers: { 'Authorization': `Bearer ${slAccessToken}` }
+                });
+                const data = await res.json();
+                if (data.socket_token) {
+                    slSocketToken = data.socket_token;
+                    connectStreamlabsSocket();
+                }
+            } catch (e) {
+                console.error("SL Token Error:", e);
+            }
+        }
+
+        function connectStreamlabsSocket() {
+            if (!slSocketToken) return;
+
+            slSocket = io(`https://sockets.streamlabs.com?token=${slSocketToken}`, {
+                transports: ['websocket']
+            });
+
+            slSocket.on('event', (eventData) => {
+                if (eventData.type === 'donation') {
+                    eventData.message.forEach(item => {
+                        const data = {
+                            type: 'donation',
+                            user: item.name,
+                            message: `Donated ${item.formatted_amount}`,
+                            chatMessage: item.message
+                        };
+                        addEventToFeed(data);
+                    });
+                }
+            });
+            console.log("Streamlabs Socket Connected");
         }
 
         async function fetchViewerCount() {
@@ -681,7 +776,7 @@
 
         // Setup UI
         const settings = {};
-        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction', 'goal', 'adbreak', 'whisper'];
+        const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction', 'goal', 'adbreak', 'whisper', 'donation'];
         
         const icons = { 
             follow: 'fa-solid fa-heart', 
@@ -695,7 +790,8 @@
             announcement: 'fa-solid fa-triangle-exclamation',
             shoutout: 'fa-solid fa-bullhorn',
             prediction: 'fa-solid fa-chart-pie',
-            whisper: 'fa-solid fa-comment-dots'
+            whisper: 'fa-solid fa-comment-dots',
+            donation: 'fa-solid fa-money-bill-wave'
         };
         
         const colors = { 
@@ -710,7 +806,8 @@
             announcement: '#ff544f',
             shoutout: '#a970ff',
             prediction: '#00cefa',
-            whisper: '#ff544f'
+            whisper: '#ff544f',
+            donation: '#00fa9a'
         };
 
         types.forEach(type => {
