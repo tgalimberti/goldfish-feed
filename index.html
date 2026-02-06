@@ -239,11 +239,23 @@
         </div>
 
         <div id="controls" class="hidden">
-            <div class="settings-section">
+        <div class="settings-section">
                 <div class="control-header" style="color: #fff; margin-bottom: 8px;">Integrations</div>
-                <button id="btn-sl-connect" class="login-btn sl-btn" onclick="authorizeStreamlabs()">
-                    <i class="fa-solid fa-flask"></i> Connect Streamlabs
-                </button>
+                
+                <div style="margin-bottom: 8px;">
+                    <label style="margin-bottom: 4px; display: block;">Streamlabs Socket Token</label>
+                    <input type="password" id="sl-token-input" placeholder="Paste token here..." 
+                        style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #000; color: #fff; box-sizing: border-box;"
+                        onchange="saveStreamlabsToken(this.value)">
+                </div>
+                
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Found in <a href="https://streamlabs.com/dashboard#/settings/api-settings" target="_blank" style="color: #31c3a2;">Streamlabs API Settings</a> -> API Tokens -> "Your Socket API Token".
+                </div>
+
+                <div id="sl-status" style="font-size: 0.8rem; color: var(--text-muted);">
+                    <i class="fa-solid fa-circle-xmark"></i> Not Connected
+                </div>
             </div>
             <div class="settings-section">
                 <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance</div>
@@ -268,7 +280,6 @@
     <script>
         const CLIENT_ID = 'lt7p3t0i66py3xi742ekkpkw8d1xvk';
         const REDIRECT_URI = window.location.origin + window.location.pathname; 
-        const SL_CLIENT_ID = 'a1026535-1489-45b9-8a86-f298b5e869ac';
         
         // State
         let accessToken = null;
@@ -323,18 +334,6 @@
         function checkAuth() {
             const hash = window.location.hash;
             
-            // Handle Streamlabs Return
-            if (hash.includes('access_token') && hash.includes('state=streamlabs')) {
-                const params = new URLSearchParams(hash.substring(1));
-                const token = params.get('access_token');
-                localStorage.setItem('sl_access_token', token);
-                
-                // Clear URL and reload to clean up
-                window.history.replaceState({}, document.title, window.location.pathname);
-                window.location.reload();
-                return;
-            }
-
             // Handle Twitch Return
             if (hash.includes('access_token')) {
                 const params = new URLSearchParams(hash.substring(1));
@@ -405,49 +404,45 @@
                 alert("Login failed. Check console.");
             }
         }
-        function authorizeStreamlabs() {
-            // 1. HARDCODE your exact Redirect URI here to avoid mismatches
-            const fixedRedirect = 'https://tgalimberti.github.io/goldfish-feed/'; 
 
-            // 2. Use a SPACE instead of a PLUS for the scope
-            const scope = 'donations.read socket.token';
-            const url = `https://streamlabs.com/api/v2.0/authorize?client_id=${SL_CLIENT_ID}&redirect_uri=${fixedRedirect}&response_type=token&scope=${scope}&state=streamlabs`;
-            window.location.href = url;
+        function saveStreamlabsToken(token) {
+            if (!token) return;
+            localStorage.setItem('sl_socket_token', token);
+            initStreamlabs();
         }
 
-        async function initStreamlabs() {
-            const savedToken = localStorage.getItem('sl_access_token');
-            if (savedToken) {
-                slAccessToken = savedToken;
-                const btn = document.getElementById('btn-sl-connect');
-                if (btn) {
-                    btn.innerText = "Streamlabs Connected";
-                    btn.disabled = true;
-                }
-                await fetchStreamlabsSocketToken();
+        function initStreamlabs() {
+            const token = localStorage.getItem('sl_socket_token');
+            const input = document.getElementById('sl-token-input');
+            const status = document.getElementById('sl-status');
+
+            if (token) {
+                if (input) input.value = token; 
+                connectStreamlabsSocket(token);
             }
         }
 
-        async function fetchStreamlabsSocketToken() {
-            try {
-                const res = await fetch('https://streamlabs.com/api/v2.0/socket/token', {
-                    headers: { 'Authorization': `Bearer ${slAccessToken}` }
-                });
-                const data = await res.json();
-                if (data.socket_token) {
-                    slSocketToken = data.socket_token;
-                    connectStreamlabsSocket();
-                }
-            } catch (e) {
-                console.error("SL Token Error:", e);
-            }
-        }
+        function connectStreamlabsSocket(token) {
+            if (slSocket) slSocket.disconnect();
 
-        function connectStreamlabsSocket() {
-            if (!slSocketToken) return;
-
-            slSocket = io(`https://sockets.streamlabs.com?token=${slSocketToken}`, {
+            slSocket = io(`https://sockets.streamlabs.com?token=${token}`, {
                 transports: ['websocket']
+            });
+
+            const status = document.getElementById('sl-status');
+
+            slSocket.on('connect', () => {
+                console.log("Streamlabs Connected");
+                if (status) {
+                    status.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #2ea44f;"></i> Connected';
+                }
+            });
+
+            slSocket.on('connect_error', (err) => {
+                console.error("SL Connect Error:", err);
+                if (status) {
+                    status.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color: #ff544f;"></i> Connection Failed (Check Token)';
+                }
             });
 
             slSocket.on('event', (eventData) => {
@@ -463,9 +458,7 @@
                     });
                 }
             });
-            console.log("Streamlabs Socket Connected");
         }
-
         async function fetchViewerCount() {
             if (!userId) return;
             try {
