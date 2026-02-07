@@ -98,6 +98,10 @@
             font-size: 1.1rem;
             display: none; 
         }
+
+        .viewercount.offline {
+            color: var(--text-muted);
+        }
         
         .app-title { font-weight: 800; font-size: 1.4rem; letter-spacing: -0.02em; }
         .username-highlight { color: #9147ff; }
@@ -230,9 +234,9 @@
             </div>
             
             <div class="header-right">
-                <div id="viewercount" class="viewercount" title="Live Viewers">
+                <div id="viewercount" class="viewercount offline" title="Stream is Offline">
                     <i class="fa-solid fa-user-group"></i>
-                    <span id="viewer-number">0</span>
+                    <span id="viewer-number">OFFLINE</span>
                 </div>
                 <button class="settings-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
             </div>
@@ -459,13 +463,14 @@
                 }
             });
         }
+
         async function fetchViewerCount() {
             if (!userId) return;
             try {
                 const res = await fetch(`https://api.twitch.tv/helix/streams?user_id=${userId}`, {
                     headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
                 });
-                
+
                 if (res.status === 401) {
                     handleTokenExpiry();
                     return;
@@ -473,13 +478,20 @@
 
                 const data = await res.json();
                 const viewEl = document.getElementById('viewercount');
-                
+                const numEl = document.getElementById('viewer-number');
+
                 if (data.data && data.data.length > 0) {
-                    document.getElementById('viewer-number').innerText = data.data[0].viewer_count;
-                    viewEl.style.display = 'flex';
+                    // Stream is LIVE
+                    numEl.innerText = data.data[0].viewer_count;
+                    viewEl.classList.remove('offline');
+                    viewEl.title = "Live Viewers";
                 } else {
-                    viewEl.style.display = 'none';
+                    // Stream is OFFLINE
+                    numEl.innerText = "OFFLINE";
+                    viewEl.classList.add('offline');
+                    viewEl.title = "Stream is Offline";
                 }
+                viewEl.style.display = 'flex'; // Ensure it's always visible
             } catch (e) {
                 console.error("Viewer fetch failed", e);
             }
