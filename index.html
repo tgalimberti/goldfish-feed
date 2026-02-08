@@ -216,6 +216,7 @@
             opacity: 0.5; border-left: 4px solid #333; background-color: transparent !important;
         }
         .event-item.acknowledged .icon-box { color: #555 !important; }
+        .hidden-force { display: none !important; }
         
     </style>
 </head>
@@ -266,6 +267,9 @@
                 <div class="behavior-options">
                     <label title="High contrast mode: Background color fills the card">
                         <input type="checkbox" id="opt-full-color" onchange="toggleFullColor(this.checked)"> Full Color Background
+                    </label>
+                    <label title="Hide the viewer count number from the header">
+                        <input type="checkbox" id="opt-hide-viewers" onchange="toggleViewerCount(this.checked)"> Hide Viewer Count
                     </label>
                 </div>
                 <div style="margin-top: 8px; font-style: italic; color: var(--text-muted);">
@@ -782,6 +786,16 @@
             document.body.classList.toggle('style-full', checked);
             savePref('fullColor', checked);
         }
+        
+        function toggleViewerCount(checked) {
+            const el = document.getElementById('viewercount');
+            if (checked) {
+                el.classList.add('hidden-force');
+            } else {
+                el.classList.remove('hidden-force');
+            }
+            savePref('hideViewers', checked);
+        }
 
         // Setup UI
         const settings = {};
@@ -894,6 +908,11 @@
             document.body.classList.add('style-full');
         }
         
+        if (localStorage.getItem('hideViewers') === 'true') {
+            document.getElementById('opt-hide-viewers').checked = true;
+            toggleViewerCount(true);
+        }
+
         checkAuth();
     </script>
 </body>
