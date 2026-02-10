@@ -986,7 +986,7 @@
             let html = `
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 <div class="content">
-                    <div style="display:flex; align-items:center;">
+                    <div style="display:flex; align-items:center; width: 100%;">
                         <span class="username">${data.user}</span>
                         <span class="timestamp" data-time="${now}">${relTime}</span>
                         ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
