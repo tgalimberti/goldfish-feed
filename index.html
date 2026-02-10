@@ -121,6 +121,30 @@
             margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #333;
         }
         .settings-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        
+        .reply-section {
+            display: none; margin-top: 10px; gap: 8px; width: 100%;
+        }
+        .reply-section.open { display: flex; }
+        
+        .reply-input {
+            flex: 1; background: #000; border: 1px solid #333; 
+            color: #fff; padding: 8px; border-radius: 4px; font-size: 0.9rem;
+        }
+        .reply-input:focus { outline: 1px solid #9147ff; border-color: #9147ff; }
+        
+        .reply-send-btn {
+            background: #9147ff; color: #fff; border: none; 
+            padding: 0 16px; border-radius: 4px; cursor: pointer; font-weight: 700;
+        }
+        .reply-send-btn:hover { background: #772ce8; }
+
+        .btn-reply-icon {
+            margin-left: auto; cursor: pointer; color: var(--text-muted); 
+            opacity: 0; transition: opacity 0.2s; padding: 4px;
+        }
+        .event-item:hover .btn-reply-icon { opacity: 1; }
+        .btn-reply-icon:hover { color: #fff; }
 
         .toggles-grid { display: flex; gap: 15px; flex-wrap: wrap; }
         .behavior-options { display: flex; gap: 20px; margin-bottom: 10px; }
@@ -347,7 +371,7 @@
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+channel:read:predictions+channel:read:goals+channel:read:ads+user:read:whispers+moderation:read';
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+channel:read:predictions+channel:read:goals+channel:read:ads+user:read:whispers+moderation:read+user:manage:whispers';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -770,6 +794,7 @@
                     data = {
                         type: 'whisper',
                         user: `${event.from_user_name} (Mod)`,
+                        userId: event.from_user_id,
                         message: event.whisper.text
                     };
                 }
@@ -835,6 +860,62 @@
                 el.classList.remove('hidden-force');
             }
             savePref('hideViewers', checked);
+        }
+        
+        // Reply Logic
+        function toggleReply(e, iconBtn) {
+            e.stopPropagation(); // Prevent card acknowledgment
+            const wrapper = iconBtn.closest('.content');
+            const replyBox = wrapper.querySelector('.reply-section');
+            replyBox.classList.toggle('open');
+            if (replyBox.classList.contains('open')) {
+                replyBox.querySelector('input').focus();
+            }
+        }
+
+        function handleReplyKey(e, targetId, inputEl) {
+            if (e.key === 'Enter') {
+                const btn = inputEl.nextElementSibling;
+                sendReply(targetId, btn);
+            }
+        }
+
+        async function sendReply(targetId, btnEl) {
+            const input = btnEl.previousElementSibling;
+            const text = input.value.trim();
+            if (!text) return;
+
+            btnEl.innerText = '...';
+            
+            try {
+                const res = await fetch(`https://api.twitch.tv/helix/whispers?from_user_id=${userId}&to_user_id=${targetId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Client-Id': CLIENT_ID,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: text })
+                });
+
+                if (res.status === 204) {
+                    input.value = '';
+                    const section = btnEl.parentElement;
+                    section.classList.remove('open');
+                    
+                    const msgEl = section.previousElementSibling;
+                    const originalColor = msgEl.style.color;
+                    msgEl.style.color = '#00fa9a'; 
+                    setTimeout(() => msgEl.style.color = originalColor, 1000);
+                    btnEl.innerText = 'Send';
+                } else {
+                    throw new Error('Failed');
+                }
+            } catch (e) {
+                console.error(e);
+                btnEl.innerText = 'Error';
+                btnEl.style.background = '#ff544f';
+            }
         }
 
         // Setup UI
@@ -905,12 +986,25 @@
             let html = `
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 <div class="content">
-                    <div><span class="username">${data.user}</span><span class="timestamp" data-time="${now}">${relTime}</span></div>
+                    <div style="display:flex; align-items:center;">
+                        <span class="username">${data.user}</span>
+                        <span class="timestamp" data-time="${now}">${relTime}</span>
+                        ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
+                    </div>
                     <div class="message">${data.message}</div>
             `;
-            
+
             if (data.chatMessage) {
                 html += `<div class="chat-message">"${data.chatMessage}"</div>`;
+            }
+
+            if (data.type === 'whisper' && data.userId) {
+                html += `
+                    <div class="reply-section" onclick="event.stopPropagation()">
+                        <input type="text" class="reply-input" placeholder="Type reply..." onkeydown="handleReplyKey(event, '${data.userId}', this)">
+                        <button class="reply-send-btn" onclick="sendReply('${data.userId}', this)">Send</button>
+                    </div>
+                `;
             }
 
             html += `</div>`;
