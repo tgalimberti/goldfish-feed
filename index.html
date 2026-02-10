@@ -217,6 +217,14 @@
         }
         .event-item.acknowledged .icon-box { color: #555 !important; }
         .hidden-force { display: none !important; }
+
+        .uptime-box {
+            display: flex; align-items: center; gap: 6px;
+            color: var(--text-muted); font-weight: 600; font-size: 1.1rem;
+            font-variant-numeric: tabular-nums;
+            margin-right: 15px;
+        }
+        .uptime-box.hidden { display: none; }
         
     </style>
 </head>
@@ -235,6 +243,10 @@
             </div>
             
             <div class="header-right">
+                <div id="uptime-display" class="uptime-box hidden">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="uptime-clock">00:00:00</span>
+                </div>
                 <div id="viewercount" class="viewercount offline" title="Stream is Offline">
                     <i class="fa-solid fa-user-group"></i>
                     <span id="viewer-number">OFFLINE</span>
@@ -299,6 +311,7 @@
         let slAccessToken = null;
         let slSocketToken = null;
         let slSocket = null;
+        let streamStartTime = null;
         
         // Session persistence logic
         function saveSession() {
@@ -406,6 +419,7 @@
                 fetchViewerCount();
                 setInterval(fetchViewerCount, 60000);
                 setInterval(updateRelativeTimes, 60000);
+                setInterval(updateUptimeClock, 1000);
 
             } catch (e) {
                 console.error("Login failed:", e);
@@ -483,17 +497,28 @@
                 const data = await res.json();
                 const viewEl = document.getElementById('viewercount');
                 const numEl = document.getElementById('viewer-number');
+                const uptimeEl = document.getElementById('uptime-display');
 
                 if (data.data && data.data.length > 0) {
                     // Stream is LIVE
-                    numEl.innerText = data.data[0].viewer_count;
+                    const streamData = data.data[0]
+                    numEl.innerText = streamData.viewer_count;
                     viewEl.classList.remove('offline');
                     viewEl.title = "Live Viewers";
+                    streamStartTime = new Date(streamData.started_at).getTime();
+                    uptimeEl.classList.remove('hidden');
                 } else {
                     // Stream is OFFLINE
                     numEl.innerText = "OFFLINE";
                     viewEl.classList.add('offline');
                     viewEl.title = "Stream is Offline";
+                    streamStartTime = null;
+                    uptimeEl.classList.add('hidden');
+                }
+                if (localStorage.getItem('hideViewers') === 'true') {
+                    viewEl.classList.add('hidden-force');
+                } else {
+                    viewEl.classList.remove('hidden-force');
                 }
                 viewEl.style.display = 'flex'; // Ensure it's always visible
             } catch (e) {
@@ -773,6 +798,21 @@
                     el.innerText = getRelativeTime(rawTime);
                 }
             });
+        }
+
+        function updateUptimeClock() {
+            if (!streamStartTime) return;
+
+            const now = Date.now();
+            const diff = now - streamStartTime;
+            const seconds = Math.floor((diff / 1000) % 60);
+            const minutes = Math.floor((diff / (1000 * 60)) % 60);
+            const hours = Math.floor((diff / (1000 * 60 * 60)));
+
+            const pad = (n) => n.toString().padStart(2, '0');
+            
+            document.getElementById('uptime-clock').innerText = 
+                `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
         }
 
         // UI Logic
