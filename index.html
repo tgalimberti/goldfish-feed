@@ -139,19 +139,20 @@
         }
         .reply-send-btn:hover { background: #772ce8; }
         .btn-reply-icon {
-            position: absolute; top: 0; right: 0; bottom: 0; width: 40px; display: flex;
+            position: absolute; top: 0; right: 0; bottom: 0; width: 50px; display: flex;
             align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted);
             opacity: 0; transition: all 0.2s;
-            background: linear-gradient(to right, transparent, rgba(0,0,0,0.5)); 
+            background: linear-gradient(to right, transparent, rgba(0,0,0,0.3)); 
             border-top-right-radius: var(--border-radius);
             border-bottom-right-radius: var(--border-radius);
+            z-index: 10;
         }
 
         .event-item:hover .btn-reply-icon { opacity: 1; }
 
         .btn-reply-icon:hover {
             color: #fff;
-            background-color: rgba(255, 255, 255, 0.15); 
+            background-color: rgba(255, 255, 255, 0.1); 
         }
 
         .toggles-grid { display: flex; gap: 15px; flex-wrap: wrap; }
@@ -257,6 +258,13 @@
             margin-right: 15px;
         }
         .uptime-box.hidden { display: none; }
+
+        .event-item.hypetrain.active .username,
+        .event-item.hypetrain.active .message {
+            position: relative;
+            z-index: 2;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
         
     </style>
 </head>
@@ -759,13 +767,23 @@
             }
             else if (type === 'channel.hype_train.begin') {
                 currentHypeLevel = 1;
-                data = { type: 'hypetrain', user: 'Hype Train', message: 'Hype Train has started!' };
+                const percent = Math.round((event.progress / event.goal) * 100) || 0;
+                data = { 
+                    type: 'hypetrain', 
+                    user: 'Hype Train', 
+                    message: `Level 1 • ${percent}%`, 
+                    expiresAt: event.expires_at 
+                };
             }
             else if (type === 'channel.hype_train.progress') {
-                if (event.level > currentHypeLevel) {
-                    currentHypeLevel = event.level;
-                    data = { type: 'hypetrain', user: 'Hype Train', message: `Reached Level ${event.level}!` };
-                }
+                currentHypeLevel = event.level;
+                const percent = Math.round((event.progress / event.goal) * 100) || 0;
+                data = { 
+                    type: 'hypetrain', 
+                    user: 'Hype Train', 
+                    message: `Level ${event.level} • ${percent}%`, 
+                    expiresAt: event.expires_at 
+                };
             }
             else if (type === 'channel.hype_train.end') {
                 currentHypeLevel = 0; 
@@ -977,6 +995,34 @@
         function toggle(t, s, v) { settings[t][s] = v; }
 
         function addEventToFeed(data, forceAck = false, forceTime = null) {
+            if (data.type === 'hypetrain' && !forceAck) {
+                const existing = document.querySelector('.event-item.hypetrain.active');
+                
+                if (existing) {
+                    existing.querySelector('.message').innerText = data.message;
+                    
+                    const oldData = JSON.parse(existing.dataset.raw);
+                    
+                    if (oldData.expiresAt !== data.expiresAt) {
+                        const duration = new Date(data.expiresAt).getTime() - Date.now();
+                        if (duration > 0) {
+                            existing.style.transition = 'none'; // Snap back
+                            existing.style.backgroundSize = '100% 100%'; // Refill bar
+                            
+                            requestAnimationFrame(() => {
+                                void existing.offsetWidth; // Force reflow
+                                existing.style.transition = `background-size ${duration}ms linear`;
+                                existing.style.backgroundSize = '0% 100%';
+                            });
+
+                        }
+                    }
+
+                    existing.dataset.raw = JSON.stringify(data);
+                    saveSession();
+                    return; 
+                }
+            }
             if (!settings[data.type].show) return;
             
             const el = document.createElement('div');
@@ -1038,7 +1084,35 @@
             };
 
             feed.prepend(el);
-            
+
+            if (data.type === 'hypetrain' && data.expiresAt && !forceAck) {
+                const duration = new Date(data.expiresAt).getTime() - Date.now();
+                
+                if (duration > 0) {
+                    // Set Initial State (Full Bar)
+                    // We use a semi-transparent orange so text remains readable
+                    el.style.backgroundImage = `linear-gradient(to right, rgba(255, 179, 0, 0.25), rgba(255, 179, 0, 0.25))`;
+                    el.style.backgroundSize = '100% 100%';
+                    el.style.backgroundRepeat = 'no-repeat';
+                    el.style.backgroundPosition = 'left center';
+
+                    // Force Reflow then Animate to 0%
+                    requestAnimationFrame(() => {
+                        void el.offsetWidth; 
+                        el.style.transition = `background-size ${duration}ms linear`;
+                        el.style.backgroundSize = '0% 100%';
+                    });
+
+                    // Auto-grey out when timer hits zero
+                    setTimeout(() => {
+                        if (el.classList.contains('active')) {
+                            el.classList.remove('active');
+                            el.classList.add('acknowledged');
+                            saveSession();
+                        }
+                    }, duration);
+                }
+            }
             void el.offsetWidth; 
             el.classList.add('show');
             
