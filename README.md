@@ -10,9 +10,9 @@ Goldfish Feed is a simple, browser-based activity feed for Twitch streamers who 
 
 ## Features
 - **All-in-one feed:** Includes all Twitch events and Streamlabs donations.
-- **Customisable:** Choose which events appear, whether they should pop up highlighted, and toggle between "Minimal" or "Full Color" high-contrast modes.
+- **Customisable:** Choose which events appear and whether they should pop up highlighted.
 - **Client-side only:** No downloads - runs entirely in-browser.
-- **Secure:** Your token never leaves your browser.
+- **Secure:** Your tokens never leave your browser.
 
 ## To-do
 - [ ] Integrate 3rd-party events:
