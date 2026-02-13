@@ -944,11 +944,13 @@
                     input.value = '';
                     const section = btnEl.parentElement;
                     section.classList.remove('open');
+
+                    const card = btnEl.closest('.event-item');
+                    if (card) {
+                        card.classList.remove('active');
+                        card.classList.add('acknowledged');
+                        saveSession();
                     
-                    const msgEl = section.previousElementSibling;
-                    const originalColor = msgEl.style.color;
-                    msgEl.style.color = '#00fa9a'; 
-                    setTimeout(() => msgEl.style.color = originalColor, 1000);
                     btnEl.innerText = 'Send';
                 } else {
                     throw new Error('Failed');
