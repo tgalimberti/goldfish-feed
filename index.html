@@ -928,7 +928,7 @@
             if (!text) return;
 
             btnEl.innerText = '...';
-            
+
             try {
                 const res = await fetch(`https://api.twitch.tv/helix/whispers?from_user_id=${userId}&to_user_id=${targetId}`, {
                     method: 'POST',
@@ -951,6 +951,7 @@
                         card.classList.add('acknowledged');
                         saveSession();
                     }
+
                     btnEl.innerText = 'Send';
                 } else {
                     throw new Error('Failed');
@@ -961,7 +962,6 @@
                 btnEl.style.background = '#ff544f';
             }
         }
-
         // Setup UI
         const settings = {};
         const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction', 'goal', 'adbreak', 'whisper', 'donation'];
