@@ -738,7 +738,8 @@
                 }
                 else if (noticeType === 'raid') {
                     const viewerCount = raid.viewer_count;
-                    data = { type: 'raid', user: event.chatter_user_name, message: `Raided with ${viewerCount} viewers` };
+                    data = { type: 'raid', user: event.chatter_user_name, userId: event.chatter_user_id,
+                            message: `Raided with ${viewerCount} viewers` };
                 }
                 else if (noticeType === 'announcement') {
                     data = {
@@ -962,6 +963,46 @@
                 btnEl.style.background = '#ff544f';
             }
         }
+
+        async function sendShoutout(e, targetId, btnEl) {
+            e.stopPropagation(); // Stop the card from clicking itself
+            
+            // Visual Feedback: Spin the icon
+            btnEl.className = 'fa-solid fa-circle-notch fa-spin btn-reply-icon';
+
+            try {
+                // Twitch API: Send Shoutout
+                const res = await fetch(`https://api.twitch.tv/helix/chat/shoutouts?from_broadcaster_id=${userId}&to_broadcaster_id=${targetId}&moderator_id=${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Client-Id': CLIENT_ID,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (res.status === 204) {
+                    // Success! Turn icon green/check
+                    btnEl.className = 'fa-solid fa-check btn-reply-icon';
+                    btnEl.style.color = '#00fa9a';
+
+                    // Auto-Complete the Card (Grey it out)
+                    const card = btnEl.closest('.event-item');
+                    if (card) {
+                        card.classList.remove('active');
+                        card.classList.add('acknowledged');
+                        saveSession();
+                    }
+                } else {
+                    throw new Error('Failed');
+                }
+            } catch (err) {
+                console.error(err);
+                btnEl.className = 'fa-solid fa-triangle-exclamation btn-reply-icon';
+                btnEl.style.color = '#ff544f';
+            }
+        }
+
         // Setup UI
         const settings = {};
         const types = ['follow', 'sub', 'giftsub', 'cheer', 'redeem', 'raid', 'poll', 'hypetrain', 'announcement', 'shoutout', 'prediction', 'goal', 'adbreak', 'whisper', 'donation'];
@@ -1062,6 +1103,7 @@
                         <span class="username">${data.user}</span>
                         <span class="timestamp" data-time="${now}">${relTime}</span>
                         ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
+                        ${data.type === 'raid' ? `<i class="fa-solid fa-bullhorn btn-reply-icon" title="Shoutout" onclick="sendShoutout(event, '${data.userId}', this)"></i>` : ''}
                     </div>
                     <div class="message">${data.message}</div>
             `;
