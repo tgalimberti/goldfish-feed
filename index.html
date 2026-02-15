@@ -1044,7 +1044,12 @@
             const group = document.createElement('div');
             group.className = 'control-group';
             group.innerHTML = `
-                <div class="control-header" style="color: ${colors[type]}">${type}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
+                    <div class="control-header" style="color: ${colors[type]}">${type}</div>
+                    <button class="test-btn" onclick="testFire('${type}')" title="Test Fire" style="background:none; border:none; color:#666; cursor:pointer; font-size:0.8rem; padding:0 4px;">
+                        <i class="fa-solid fa-flask"></i>
+                    </button>
+                </div>
                 <label><input type="checkbox" checked onchange="toggle('${type}', 'show', this.checked)"> Show</label>
                 <label><input type="checkbox" checked onchange="toggle('${type}', 'highlight', this.checked)"> Highlight</label>
             `;
@@ -1052,6 +1057,100 @@
         });
 
         function toggle(t, s, v) { settings[t][s] = v; }
+
+        function testFire(type) {
+            const randomUser = 'User_' + Math.floor(Math.random() * 999);
+            
+            let mockData = {
+                type: type,
+                user: randomUser,
+                message: 'Test Event triggered',
+                timestamp: Date.now()
+            };
+
+            switch(type) {
+                case 'follow':
+                    mockData.message = 'Followed you';
+                    break;
+                
+                case 'sub':
+                    mockData.message = 'Resubscribed for 3 months (Tier 1)';
+                    mockData.chatMessage = 'Love the stream! peepoFaff';
+                    break;
+
+                case 'giftsub':
+                    mockData.user = 'GoldfishGifter';
+                    mockData.message = `Gifted a Tier 1 Sub to ${randomUser}`;
+                    break;
+
+                case 'cheer':
+                    mockData.message = 'Cheered 500 bits';
+                    mockData.chatMessage = '!sr Goldfish and Smoke';
+                    break;
+
+                case 'redeem':
+                    mockData.message = 'Redeemed "Hydrate"';
+                    mockData.chatMessage = 'mmm delicious H2O';
+                    break;
+
+                case 'raid':
+                    mockData.user = 'asmongoldfish';
+                    mockData.userId = '123'; 
+                    mockData.message = 'Raided with 421 viewers';
+                    break;
+
+                case 'poll':
+                    mockData.user = 'Poll Started';
+                    mockData.message = 'Open or closed sandwiches?';
+                    break;
+
+                case 'hypetrain':
+                    mockData.user = 'Hype Train';
+                    mockData.message = 'Level 3 • 65%';
+                    mockData.expiresAt = Date.now() + 60000; 
+                    break;
+
+                case 'announcement':
+                    mockData.user = 'some_random_mod';
+                    mockData.message = 'Announcement';
+                    mockData.chatMessage = 'Pre-order Roswell Road\'s new album \'Rebel Joy\' here: https://roswellroadmusic.bandcamp.com/album/rebel-joy';
+                    break;
+
+                case 'shoutout':
+                    mockData.user = 'Shoutta05';
+                    mockData.message = 'Gave you a Shoutout to (42 viewers)';
+                    break;
+
+                case 'prediction':
+                    mockData.user = 'Prediction Started';
+                    mockData.message = 'Will streamer yawn during this hype train?';
+                    break;
+
+                case 'whisper':
+                    mockData.user = 'some_random_mod';
+                    mockData.userId = '123'; 
+                    mockData.message = 'Last call before we close song requests?';
+                    break;
+
+                case 'donation':
+                    mockData.user = 'GenerousViewer';
+                    mockData.message = 'Donated $25.00';
+                    mockData.chatMessage = 'Keep up the good work!';
+                    break;
+                
+                case 'goal':
+                    mockData.user = 'Follow Goal';
+                    mockData.message = 'Goal Reached: 1000 Followers!';
+                    break;
+
+                case 'adbreak':
+                    mockData.user = 'Ad Break';
+                    mockData.message = 'Running a 90s Ad Break';
+                    break;
+            }
+
+            addEventToFeed(mockData);
+        }
 
         function addEventToFeed(data, forceAck = false, forceTime = null) {
             if (data.type === 'hypetrain' && !forceAck) {
