@@ -407,7 +407,7 @@
 
         // Authentication
         function authorize() {
-            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+channel:read:predictions+channel:read:goals+channel:read:ads+user:read:whispers+moderation:read+user:manage:whispers';
+            const scopes = 'chat:read+moderator:read:followers+channel:read:subscriptions+channel:read:redemptions+bits:read+channel:read:polls+channel:read:hype_train+user:read:chat+moderator:read:shoutouts+moderator:manage:shoutouts+channel:read:predictions+channel:read:goals+channel:read:ads+user:read:whispers+moderation:read+user:manage:whispers';
             const url = `https://id.twitch.tv/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=token&scope=${scopes}`;
             window.location.href = url;
         }
@@ -988,7 +988,6 @@
         async function sendShoutout(e, targetId, btnEl) {
             e.stopPropagation(); // Stop the card from clicking itself
             
-            // Visual Feedback: Spin the icon
             btnEl.className = 'fa-solid fa-circle-notch fa-spin btn-reply-icon';
 
             try {
