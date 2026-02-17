@@ -783,8 +783,29 @@
                 data = { type: 'poll', user: 'Poll Started', message: event.title };
             }
             else if (type === 'channel.poll.end') {
-                const winner = event.choices.reduce((max, choice) => max.votes > choice.votes ? max : choice);
-                data = { type: 'poll', user: 'Poll Ended', message: `Winner: ${winner.title} (${winner.votes} votes)` };
+                const maxVotes = Math.max(...event.choices.map(c => c.votes));
+                const winners = event.choices.filter(c => c.votes === maxVotes);
+                const winnerText = winners.map(w => w.title).join(" & "); // e.g. "Pizza & Burgers"
+                const message = `Winner: ${winnerText} (${maxVotes} votes)`;
+
+                const existingPoll = document.querySelector('.event-item.poll.active');
+                
+                if (existingPoll) {
+                    existingPoll.querySelector('.username').innerText = 'Poll Ended';
+                    existingPoll.querySelector('.message').innerText = message;
+                    
+                    existingPoll.classList.remove('active');
+                    existingPoll.classList.add('acknowledged');
+                    
+                    const raw = JSON.parse(existingPoll.dataset.raw);
+                    raw.message = message;
+                    raw.user = 'Poll Ended';
+                    existingPoll.dataset.raw = JSON.stringify(raw);
+                    
+                    saveSession();
+                } else {
+                    data = { type: 'poll', user: 'Poll Ended', message: message };
+                }
             }
             else if (type === 'channel.hype_train.begin') {
                 currentHypeLevel = 1;
