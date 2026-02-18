@@ -189,7 +189,7 @@
         }
 
         .icon-box { width: 20px; margin-right: 12px; display: flex; justify-content: center; font-size: 16px; margin-top: 1px; }
-        .content { display: flex; flex-direction: column; flex: 1; line-height: 1.4; }
+        .content { display: flex; flex-direction: column; flex: 1; line-height: 1.4; padding-right: 50px; }
         .username { font-weight: 700; color: var(--text-main); }
         .message { color: var(--text-muted); margin-top: 4px; font-style: italic; }
         .chat-message { margin-top: 4px; color: var(--text-main); opacity: 0.9; word-break: break-word; }
@@ -1146,7 +1146,7 @@
                 case 'hypetrain':
                     mockData.user = 'Hype Train';
                     mockData.message = 'Level 3 • 65%';
-                    mockData.expiresAt = Date.now() + 60000; 
+                    mockData.expiresAt = Date.now() + 300000; 
                     break;
 
                 case 'announcement':
@@ -1214,12 +1214,11 @@
             let html = `
                 ${timerHtml}
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
+                
                 <div class="content">
                     <div style="display:flex; align-items:center; width: 100%;">
                         <span class="username">${data.user}</span>
                         <span class="timestamp" data-time="${now}">${relTime}</span>
-                        ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
-                        ${data.type === 'raid' ? `<i class="fa-solid fa-bullhorn btn-reply-icon" title="Shoutout" onclick="sendShoutout(event, '${data.userId}', this)"></i>` : ''}
                     </div>
                     <div class="message">${data.message}</div>
             `;
@@ -1238,10 +1237,20 @@
             }
 
             html += `</div>`;
+
+            if (data.type === 'whisper') {
+                html += `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>`;
+            }
+            if (data.type === 'raid') {
+                html += `<i class="fa-solid fa-bullhorn btn-reply-icon" title="Shoutout" onclick="sendShoutout(event, '${data.userId}', this)"></i>`;
+            }
+
             el.innerHTML = html;
 
             el.onclick = (e) => {
                 if (e.target.closest('.delete-btn')) return;
+                if (e.target.closest('.reply-section')) return;
+                
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
                     el.classList.add('acknowledged');
@@ -1267,7 +1276,6 @@
                 if (duration > 0 && timerBar) {
                     setTimeout(() => {
                         if (!el.isConnected) return;
-                        
                         timerBar.style.transition = `width ${duration}ms linear`;
                         timerBar.style.width = '0%';
                     }, 500);
