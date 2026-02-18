@@ -243,7 +243,6 @@
         .event-item.donation.active { background-color: var(--color-donation); }
         .event-item.raid.active { background-color: var(--color-raid); }
         .event-item.poll.active { background-color: var(--color-poll); }
-        .event-item.hypetrain.active { background-color: var(--color-hypetrain); }
         .event-item.shoutout.active { background-color: var(--color-giftsub); }
         .event-item.announcement.active { background-color: var(--color-raid); }
         .event-item.prediction.active { background-color: var(--color-poll); }
@@ -283,10 +282,30 @@
         }
         .uptime-box.hidden { display: none; }
 
+        .timer-bg {
+            position: absolute; top: 0; left: 0; bottom: 0;
+            background-color: #ffb300;
+            z-index: 0; width: 100%; pointer-events: none;
+            transition: width linear;
+        }
+
+        .event-item.hypetrain.active {
+            background-color: #1f1f23 !important;
+        }
+
         .event-item.hypetrain.active .username,
         .event-item.hypetrain.active .message {
+            color: #fff !important;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
             position: relative;
             z-index: 2;
+        }
+
+        .event-item .content, 
+        .event-item .icon-box, 
+        .event-item .btn-reply-icon { 
+            position: relative; 
+            z-index: 2; 
         }
         
     </style>
@@ -1173,49 +1192,27 @@
         }
 
         function addEventToFeed(data, forceAck = false, forceTime = null) {
-            if (data.type === 'hypetrain' && !forceAck) {
-                const existing = document.querySelector('.event-item.hypetrain.active');
-                
-                if (existing) {
-                    existing.querySelector('.message').innerText = data.message;
-                    
-                    const oldData = JSON.parse(existing.dataset.raw);
-                    
-                    if (oldData.expiresAt !== data.expiresAt) {
-                        const duration = new Date(data.expiresAt).getTime() - Date.now();
-                        if (duration > 0) {
-                            existing.style.transition = 'none'; // Snap back
-                            existing.style.backgroundSize = '100% 100%'; // Refill bar
-                            
-                            requestAnimationFrame(() => {
-                                void existing.offsetWidth; // Force reflow
-                                existing.style.transition = `background-size ${duration}ms linear`;
-                                existing.style.backgroundSize = '0% 100%';
-                            });
-
-                        }
-                    }
-
-                    existing.dataset.raw = JSON.stringify(data);
-                    saveSession();
-                    return; 
-                }
-            }
             if (!settings[data.type].show) return;
-            
+
             const el = document.createElement('div');
             el.dataset.raw = JSON.stringify(data);
-            
-            const initialState = forceAck 
-                ? 'acknowledged' 
+
+            const initialState = forceAck
+                ? 'acknowledged'
                 : (settings[data.type].highlight ? 'active' : 'acknowledged');
-            
+
             el.className = `event-item ${data.type} ${initialState}`;
-            
+
             const now = forceTime ? parseInt(forceTime) : Date.now();
             const relTime = getRelativeTime(now);
 
+            let timerHtml = '';
+            if (data.type === 'hypetrain' && data.expiresAt && !forceAck) {
+                timerHtml = `<div class="timer-bg" style="width: 100%"></div>`;
+            }
+
             let html = `
+                ${timerHtml}
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 <div class="content">
                     <div style="display:flex; align-items:center; width: 100%;">
@@ -1245,7 +1242,6 @@
 
             el.onclick = (e) => {
                 if (e.target.closest('.delete-btn')) return;
-
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
                     el.classList.add('acknowledged');
@@ -1255,7 +1251,7 @@
                 }
                 saveSession();
             };
-            
+
             el.oncontextmenu = (e) => {
                 e.preventDefault();
                 el.remove();
@@ -1266,25 +1262,18 @@
 
             if (data.type === 'hypetrain' && data.expiresAt && !forceAck) {
                 const duration = new Date(data.expiresAt).getTime() - Date.now();
-                
-                if (duration > 0) {
-                    // Set Initial State (Full Bar)
-                    // We use a semi-transparent orange so text remains readable
-                    el.style.backgroundImage = `linear-gradient(to right, rgba(255, 179, 0, 0.25), rgba(255, 179, 0, 0.25))`;
-                    el.style.backgroundSize = '100% 100%';
-                    el.style.backgroundRepeat = 'no-repeat';
-                    el.style.backgroundPosition = 'left center';
+                const timerBar = el.querySelector('.timer-bg');
 
-                    // Force Reflow then Animate to 0%
-                    requestAnimationFrame(() => {
-                        void el.offsetWidth; 
-                        el.style.transition = `background-size ${duration}ms linear`;
-                        el.style.backgroundSize = '0% 100%';
-                    });
-
-                    // Auto-grey out when timer hits zero
+                if (duration > 0 && timerBar) {
                     setTimeout(() => {
-                        if (el.classList.contains('active')) {
+                        if (!el.isConnected) return;
+                        
+                        timerBar.style.transition = `width ${duration}ms linear`;
+                        timerBar.style.width = '0%';
+                    }, 500);
+
+                    setTimeout(() => {
+                        if (el.isConnected && el.classList.contains('active')) {
                             el.classList.remove('active');
                             el.classList.add('acknowledged');
                             saveSession();
@@ -1292,9 +1281,10 @@
                     }, duration);
                 }
             }
-            void el.offsetWidth; 
+
+            void el.offsetWidth;
             el.classList.add('show');
-            
+
             if (!forceTime) saveSession();
         }
 
