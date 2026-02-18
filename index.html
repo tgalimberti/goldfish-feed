@@ -139,10 +139,12 @@
         }
         .reply-send-btn:hover { background: #772ce8; }
         .btn-reply-icon {
-            position: absolute; top: 0; right: 0; bottom: 0; width: 50px; display: flex;
+            position: relative; top: auto; right: auto; bottom: auto; width: auto; display: inline-flex;
             align-items: center; justify-content: center; cursor: pointer; color: var(--text-muted);
-            opacity: 0; transition: all 0.2s;
-            background: linear-gradient(to right, transparent, rgba(0,0,0,0.3)); 
+            opacity: 0.8; border-radius: 4px; transition: all 0.2s; margin-left: 15px; padding: 6px 12px;
+            font-size: 1rem;
+            background-color: rgba(255, 255, 255, 0.05); 
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-top-right-radius: var(--border-radius);
             border-bottom-right-radius: var(--border-radius);
             z-index: 10;
@@ -152,7 +154,7 @@
 
         .btn-reply-icon:hover {
             color: #fff;
-            background-color: rgba(255, 255, 255, 0.1); 
+            background-color: #9147ff; 
         }
 
         .toggles-grid { display: flex; gap: 15px; flex-wrap: wrap; }
@@ -1210,15 +1212,17 @@
             if (data.type === 'hypetrain' && data.expiresAt && !forceAck) {
                 timerHtml = `<div class="timer-bg" style="width: 100%"></div>`;
             }
-
             let html = `
                 ${timerHtml}
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 
                 <div class="content">
-                    <div style="display:flex; align-items:center; width: 100%;">
+                    <div style="display:flex; align-items:center; width: 100%; flex-wrap: wrap;">
                         <span class="username">${data.user}</span>
                         <span class="timestamp" data-time="${now}">${relTime}</span>
+                        
+                        ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
+                        ${data.type === 'raid' ? `<i class="fa-solid fa-bullhorn btn-reply-icon" title="Shoutout" onclick="sendShoutout(event, '${data.userId}', this)"></i>` : ''}
                     </div>
                     <div class="message">${data.message}</div>
             `;
@@ -1237,13 +1241,6 @@
             }
 
             html += `</div>`;
-
-            if (data.type === 'whisper') {
-                html += `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>`;
-            }
-            if (data.type === 'raid') {
-                html += `<i class="fa-solid fa-bullhorn btn-reply-icon" title="Shoutout" onclick="sendShoutout(event, '${data.userId}', this)"></i>`;
-            }
 
             el.innerHTML = html;
 
