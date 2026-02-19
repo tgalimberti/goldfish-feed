@@ -1220,17 +1220,15 @@
                 timerHtml = `<div class="timer-bg" style="width: 100%"></div>`;
             }
 
-            // 1. Determine if this is a "System" event (No link) or a User event (Link)
             const systemEvents = ['poll', 'hypetrain', 'prediction', 'goal', 'adbreak'];
             const isSystem = systemEvents.includes(data.type);
-            
-            // 2. Build the Username HTML
-            // onclick="event.stopPropagation()" prevents the card from closing/dimming when you click the name
+
+            const urlUser = data.user.replace(' (Mod)', '');
+
             const userHtml = isSystem
                 ? `<span class="username">${data.user}</span>`
-                : `<a href="https://twitch.tv/${data.user}" target="_blank" class="username" onclick="event.stopPropagation()">${data.user}</a>`;
+                : `<a href="https://twitch.tv/${urlUser}" target="_blank" class="username" onclick="event.stopPropagation()">${data.user}</a>`;
 
-            // HTML CONSTRUCTION
             let html = `
                 ${timerHtml}
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
@@ -1259,12 +1257,13 @@
                 `;
             }
 
-            html += `</div>`; // Close Content
+            html += `</div>`;
             el.innerHTML = html;
 
             el.onclick = (e) => {
                 if (e.target.closest('.delete-btn')) return;
                 if (e.target.closest('.reply-section')) return;
+                if (e.target.tagName === 'A') return;
                 
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
