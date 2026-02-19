@@ -309,7 +309,14 @@
             position: relative; 
             z-index: 2; 
         }
-        
+        a.username {
+            text-decoration: none;
+            color: var(--text-main);
+        }
+        a.username:hover {
+            text-decoration: underline;
+        }
+
     </style>
 </head>
 <body>
@@ -1212,13 +1219,25 @@
             if (data.type === 'hypetrain' && data.expiresAt && !forceAck) {
                 timerHtml = `<div class="timer-bg" style="width: 100%"></div>`;
             }
+
+            // 1. Determine if this is a "System" event (No link) or a User event (Link)
+            const systemEvents = ['poll', 'hypetrain', 'prediction', 'goal', 'adbreak'];
+            const isSystem = systemEvents.includes(data.type);
+            
+            // 2. Build the Username HTML
+            // onclick="event.stopPropagation()" prevents the card from closing/dimming when you click the name
+            const userHtml = isSystem
+                ? `<span class="username">${data.user}</span>`
+                : `<a href="https://twitch.tv/${data.user}" target="_blank" class="username" onclick="event.stopPropagation()">${data.user}</a>`;
+
+            // HTML CONSTRUCTION
             let html = `
                 ${timerHtml}
                 <div class="icon-box"><i class="${icons[data.type]}"></i></div>
                 
                 <div class="content">
                     <div style="display:flex; align-items:center; width: 100%; flex-wrap: wrap;">
-                        <span class="username">${data.user}</span>
+                        ${userHtml}
                         <span class="timestamp" data-time="${now}">${relTime}</span>
                         
                         ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
@@ -1240,8 +1259,7 @@
                 `;
             }
 
-            html += `</div>`;
-
+            html += `</div>`; // Close Content
             el.innerHTML = html;
 
             el.onclick = (e) => {
