@@ -730,7 +730,11 @@
                          const recipient = subGift.recipient_user_name;
                          const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
                          
-                         data = { type: 'giftsub', user: gifter, message: `Gifted a Tier ${tier} Sub to ${recipient}` };
+                         const durationText = (subGift.duration_months && subGift.duration_months > 1) 
+                             ? ` ${subGift.duration_months}-Month` 
+                             : '';
+
+                         data = { type: 'giftsub', user: gifter, message: `Gifted a${durationText} Tier ${tier} Sub to ${recipient}` };
                     }
                 }
                 else if (noticeType === 'community_sub_gift') {
@@ -1136,7 +1140,7 @@
 
                 case 'giftsub':
                     mockData.user = 'GoldfishGifter';
-                    mockData.message = `Gifted a Tier 1 Sub to ${randomUser}`;
+                    mockData.message = `Gifted a 3-Month Tier 1 Sub to ${randomUser}`;
                     break;
 
                 case 'cheer':
