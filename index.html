@@ -687,32 +687,40 @@
                 const communityGift = event.community_sub_gift;
                 const raid = event.raid;
                 const payForward = event.pay_it_forward;
-                
+
                 if (noticeType === 'sub') {
-                    const plan = String(sub.sub_plan);
+                    const plan = String(sub.sub_plan || sub.sub_tier);
                     const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
                     
+                    const durationText = (sub.duration_months && sub.duration_months > 1) 
+                        ? ` for ${sub.duration_months} Months` 
+                        : '';
+
                     if (sub.is_prime || plan === "Prime") {
-                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed with Prime` };
+                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed${durationText} with Prime` };
                     } else {
-                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed (Tier ${tier})` };
+                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed${durationText} (Tier ${tier})` };
                     }
                 }
                 else if (noticeType === 'resub') {
-                    const plan = resub.sub_plan;
+                    const plan = String(resub.sub_plan || resub.sub_tier);
                     const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
                     const months = resub.cumulative_months;
                     
-                    let msgText = `Resubscribed for ${months} months (Tier ${tier})`;
+                    const advanceText = (resub.duration_months && resub.duration_months > 1) 
+                        ? ` [+${resub.duration_months} Months in Advance]` 
+                        : '';
+
+                    let msgText = `Resubscribed for ${months} months (Tier ${tier})${advanceText}`;
                     if (resub.is_prime || plan === "Prime") {
                         msgText = `Resubscribed for ${months} months with Prime`;
                     }
-                    
-                    data = { 
-                        type: 'sub', 
-                        user: event.chatter_user_name, 
+
+                    data = {
+                        type: 'sub',
+                        user: event.chatter_user_name,
                         message: msgText,
-                        chatMessage: event.message?.text 
+                        chatMessage: event.message?.text
                     };
                 }
                 else if (noticeType === 'sub_gift') {
