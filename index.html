@@ -706,14 +706,17 @@
                     const plan = String(resub.sub_plan || resub.sub_tier);
                     const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
                     const months = resub.cumulative_months;
+                    const streak = resub.streak_months;
                     
                     const advanceText = (resub.duration_months && resub.duration_months > 1) 
                         ? ` [+${resub.duration_months} Months in Advance]` 
                         : '';
+                        
+                    const streakText = streak ? ` [${streak} Month Streak]` : '';
 
-                    let msgText = `Resubscribed for ${months} months (Tier ${tier})${advanceText}`;
+                    let msgText = `Resubscribed for ${months} months (Tier ${tier})${advanceText}${streakText}`;
                     if (resub.is_prime || plan === "Prime") {
-                        msgText = `Resubscribed for ${months} months with Prime`;
+                        msgText = `Resubscribed for ${months} months with Prime${streakText}`;
                     }
 
                     data = {
@@ -1134,7 +1137,7 @@
                     break;
 
                 case 'sub':
-                    mockData.message = 'Resubscribed for 3 months (Tier 1) [+6 Months in Advance]';
+                    mockData.message = 'Resubscribed for 3 months (Tier 1) [+6 Months in Advance] [3 Month Streak]';
                     mockData.chatMessage = 'Love the stream! peepoFaff';
                     break;
 
