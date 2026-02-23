@@ -861,14 +861,26 @@
                 };
             }
             else if (type === 'channel.hype_train.progress') {
-                currentHypeLevel = event.level;
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
-                data = { 
-                    type: 'hypetrain', 
-                    user: 'Hype Train', 
-                    message: `Level ${event.level} • ${percent}%`, 
-                    expiresAt: event.expires_at 
-                };
+                
+                if (event.level > currentHypeLevel) {
+                    currentHypeLevel = event.level;
+                    data = {
+                        type: 'hypetrain',
+                        user: 'Hype Train',
+                        message: `Level ${event.level} • ${percent}%`,
+                        expiresAt: event.expires_at
+                    };
+                } else {
+                    const existing = document.querySelector('.event-item.hypetrain.active');
+                    if (existing) {
+                        existing.querySelector('.message').innerText = `Level ${event.level} • ${percent}%`;
+                        const raw = JSON.parse(existing.dataset.raw);
+                        raw.message = `Level ${event.level} • ${percent}%`;
+                        existing.dataset.raw = JSON.stringify(raw);
+                        saveSession();
+                    }
+                }
             }
             else if (type === 'channel.hype_train.end') {
                 currentHypeLevel = 0; 
