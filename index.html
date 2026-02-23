@@ -708,13 +708,9 @@
                     const months = resub.cumulative_months;
                     const streak = resub.streak_months;
                     
-                    const advanceText = (resub.duration_months && resub.duration_months > 1) 
-                        ? ` [+${resub.duration_months} Months in Advance]` 
-                        : '';
-                        
                     const streakText = streak ? ` [${streak} Month Streak]` : '';
 
-                    let msgText = `Resubscribed for ${months} months (Tier ${tier})${advanceText}${streakText}`;
+                    let msgText = `Resubscribed for ${months} months (Tier ${tier})${streakText}`;
                     if (resub.is_prime || plan === "Prime") {
                         msgText = `Resubscribed for ${months} months with Prime${streakText}`;
                     }
@@ -733,7 +729,8 @@
                          const recipient = subGift.recipient_user_name;
                          const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
                          
-                         const durationText = (subGift.duration_months && subGift.duration_months > 1) 
+                         const validGiftDurations = [3, 6, 12];
+                         const durationText = validGiftDurations.includes(subGift.duration_months) 
                              ? ` ${subGift.duration_months}-Month` 
                              : '';
 
