@@ -347,16 +347,17 @@
         </div>
 
         <div id="controls" class="hidden">
-        <div class="settings-section">
+
+            <div class="settings-section">
                 <div class="control-header" style="color: #fff; margin-bottom: 8px;">Integrations</div>
-                
+
                 <div style="margin-bottom: 8px;">
                     <label style="margin-bottom: 4px; display: block;">Streamlabs Socket Token</label>
-                    <input type="password" id="sl-token-input" placeholder="Paste token here..." 
+                    <input type="password" id="sl-token-input" placeholder="Paste token here..."
                         style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #333; background: #000; color: #fff; box-sizing: border-box;"
                         onchange="saveStreamlabsToken(this.value)">
                 </div>
-                
+
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
                     Found in <a href="https://streamlabs.com/dashboard#/settings/api-settings" target="_blank" style="color: #31c3a2;">Streamlabs API Settings</a> -> API Tokens -> "Your Socket API Token".
                 </div>
@@ -365,6 +366,7 @@
                     <i class="fa-solid fa-circle-xmark"></i> Not Connected
                 </div>
             </div>
+
             <div class="settings-section">
                 <div class="control-header" style="color: #fff; margin-bottom: 8px;">Appearance</div>
                 <div class="behavior-options">
@@ -372,7 +374,13 @@
                         <input type="checkbox" id="opt-hide-viewers" onchange="toggleViewerCount(this.checked)"> Hide Viewer Count
                     </label>
                 </div>
-                <div style="margin-top: 8px; font-style: italic; color: var(--text-muted);">
+                
+                <div class="control-header" style="color: #fff; margin-bottom: 8px; margin-top: 15px;">Feed Actions</div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="clearFeed()" style="background: #333; color: #ff544f; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;"><i class="fa-solid fa-trash"></i> Clear Feed</button>
+                </div>
+
+                <div style="margin-top: 12px; font-style: italic; color: var(--text-muted);">
                     Tip: Right-click an event to delete it instantly.
                 </div>
             </div>
@@ -381,7 +389,6 @@
                 <div class="toggles-grid" id="toggles-container"></div>
             </div>
         </div>
-
         <div id="feed"></div>
     </div>
 
@@ -611,6 +618,13 @@
                 viewEl.style.display = 'flex'; // Ensure it's always visible
             } catch (e) {
                 console.error("Viewer fetch failed", e);
+            }
+        }
+
+        function clearFeed() {
+            if (confirm('Are you sure you want to clear all events?')) {
+                document.getElementById('feed').innerHTML = '';
+                saveSession();
             }
         }
 
