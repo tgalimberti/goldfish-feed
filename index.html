@@ -697,8 +697,11 @@
         }
 
         function linkify(text) {
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            return text.replace(urlRegex, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()" style="color: #9147ff;">${url}</a>`);
+            const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+            return text.replace(urlRegex, url => {
+                const href = url.startsWith('http') ? url : `https://${url}`;
+                return `<a href="${href}" target="_blank" onclick="event.stopPropagation()" style="color: #9147ff; position: relative; z-index: 50;">${url}</a>`;
+            });
         }
 
         // Handle events
@@ -1315,7 +1318,7 @@
             el.onclick = (e) => {
                 if (e.target.closest('.delete-btn')) return;
                 if (e.target.closest('.reply-section')) return;
-                if (e.target.tagName === 'A') return;
+                if (e.target.closest('a')) return;
                 
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
