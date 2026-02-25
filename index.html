@@ -696,6 +696,11 @@
             console.log("Subscriptions registered.");
         }
 
+        function linkify(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            return text.replace(urlRegex, url => `<a href="${url}" target="_blank" onclick="event.stopPropagation()" style="color: #9147ff;">${url}</a>`);
+        }
+
         // Handle events
         function handleNotification(payload) {
             const event = payload.event;
@@ -938,7 +943,7 @@
                         type: 'whisper',
                         user: `${event.from_user_name} (Mod)`,
                         userId: event.from_user_id,
-                        message: event.whisper.text
+                        message: linkify(event.whisper.text)
                     };
                 }
             }
@@ -1224,7 +1229,7 @@
                 case 'whisper':
                     mockData.user = 'some_random_mod';
                     mockData.userId = '123'; 
-                    mockData.message = 'Last call before we close song requests?';
+                    mockData.message = 'Check out this cool website https://roswellroadmusic.com';
                     break;
 
                 case 'donation':
