@@ -377,6 +377,7 @@
                 
                 <div class="control-header" style="color: #fff; margin-bottom: 8px; margin-top: 15px;">Feed Actions</div>
                 <div style="display: flex; gap: 10px;">
+                    <button onclick="markAllRead()" style="background: #333; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;"><i class="fa-solid fa-check-double"></i> Mark All Read</button>
                     <button onclick="clearFeed()" style="background: #333; color: #ff544f; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;"><i class="fa-solid fa-trash"></i> Clear Feed</button>
                 </div>
 
@@ -621,8 +622,16 @@
             }
         }
 
+        function markAllRead() {
+            document.querySelectorAll('.event-item.active').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('acknowledged');
+            });
+            saveSession();
+        }
+
         function clearFeed() {
-            if (confirm('Are you sure you want to clear all events?')) {
+            if (confirm('Clear all events from the feed? Past events will still be visible in your Twitch feed.')) {
                 document.getElementById('feed').innerHTML = '';
                 saveSession();
             }
