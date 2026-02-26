@@ -942,11 +942,19 @@
             }
             else if (type === 'user.whisper.message') {
                 if (moderatorIds.has(event.from_user_id)) {
+                    const text = event.whisper.text;
+                    const urlMatch = text.match(/(https?:\/\/[^\s]+|www\.[^\s]+)/);
+                    let extractedLink = null;
+                    if (urlMatch) {
+                        extractedLink = urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`;
+                    }
+
                     data = {
                         type: 'whisper',
                         user: `${event.from_user_name} (Mod)`,
                         userId: event.from_user_id,
-                        message: linkify(event.whisper.text)
+                        message: text,
+                        link: extractedLink
                     };
                 }
             }
@@ -1233,6 +1241,7 @@
                     mockData.user = 'some_random_mod';
                     mockData.userId = '123'; 
                     mockData.message = 'Check out this cool website https://roswellroadmusic.com';
+                    mockData.link = 'https://roswellroadmusic.com'
                     break;
 
                 case 'donation':
@@ -1292,9 +1301,10 @@
                     <div style="display:flex; align-items:center; width: 100%; flex-wrap: wrap;">
                         ${userHtml}
                         <span class="timestamp" data-time="${now}">${relTime}</span>
-                        
+
                         ${data.type === 'whisper' ? `<i class="fa-solid fa-reply btn-reply-icon" title="Reply" onclick="toggleReply(event, this)"></i>` : ''}
                         ${data.type === 'raid' ? `<i class="fa-solid fa-bullhorn btn-reply-icon" title="Shoutout" onclick="sendShoutout(event, '${data.userId}', this)"></i>` : ''}
+                        ${data.link ? `<i class="fa-solid fa-up-right-from-square btn-reply-icon" title="Open Link" onclick="event.stopPropagation(); window.open('${data.link}', '_blank');"></i>` : ''}
                     </div>
                     <div class="message">${data.message}</div>
             `;
@@ -1316,15 +1326,9 @@
             el.innerHTML = html;
 
             el.onclick = (e) => {
-                const link = e.target.closest('a');
-                if (link) {
-                    e.preventDefault();
-                    window.open(link.href, '_blank');
-                    return;
-                }
-
                 if (e.target.closest('.delete-btn')) return;
                 if (e.target.closest('.reply-section')) return;
+                if (e.target.tagName === 'A') return;
 
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
