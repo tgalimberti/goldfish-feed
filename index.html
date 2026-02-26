@@ -700,7 +700,7 @@
             const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
             return text.replace(urlRegex, url => {
                 const href = url.startsWith('http') ? url : `https://${url}`;
-                return `<a href="${href}" target="_blank" onclick="event.stopPropagation()" style="color: #9147ff; position: relative; z-index: 50;">${url}</a>`;
+                return `<a href="${href}" style="color: #9147ff; text-decoration: underline;">${url}</a>`;
             });
         }
 
@@ -1316,10 +1316,16 @@
             el.innerHTML = html;
 
             el.onclick = (e) => {
+                const link = e.target.closest('a');
+                if (link) {
+                    e.preventDefault();
+                    window.open(link.href, '_blank');
+                    return;
+                }
+
                 if (e.target.closest('.delete-btn')) return;
                 if (e.target.closest('.reply-section')) return;
-                if (e.target.closest('a')) return;
-                
+
                 if (el.classList.contains('active')) {
                     el.classList.remove('active');
                     el.classList.add('acknowledged');
