@@ -755,14 +755,14 @@
                 }
                 else if (noticeType === 'sub_gift') {
                     if (!subGift.community_gift_id) {
-                         const plan = subGift.sub_plan;
-                         const tier = plan === "2000" ? "2" : (plan === "3000" ? "3" : "1");
+                         const tierStr = String(subGift.sub_tier);
+                         const tier = tierStr === "2000" ? "2" : (tierStr === "3000" ? "3" : "1");
                          const recipient = subGift.recipient_user_name;
                          const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
-                         
+
                          const validGiftDurations = [3, 6, 12];
-                         const durationText = validGiftDurations.includes(subGift.duration_months) 
-                             ? ` ${subGift.duration_months}-Month` 
+                         const durationText = validGiftDurations.includes(subGift.duration_months)
+                             ? ` ${subGift.duration_months}-Month`
                              : '';
 
                          data = { type: 'giftsub', user: gifter, message: `Gifted a${durationText} Tier ${tier} Sub to ${recipient}` };
@@ -770,17 +770,24 @@
                 }
                 else if (noticeType === 'community_sub_gift') {
                     const count = communityGift.total;
-                    const plan = communityGift.sub_plan;
-                    const tier = plan === "2000" ? "2" : (plan === "3000" ? "3" : "1");
+                    const tierStr = String(communityGift.sub_tier);
+                    const tier = tierStr === "2000" ? "2" : (tierStr === "3000" ? "3" : "1");
                     const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
                     const cumulative = communityGift.cumulative_total;
-                    
+
                     let msg = `Gifted ${count} Tier ${tier} Subs`;
                     if (cumulative && cumulative > 0) {
                         msg += ` (Total Given: ${cumulative})`;
                     }
-                    
+
                     data = { type: 'giftsub', user: gifter, message: msg };
+                }
+                else if (noticeType === 'prime_paid_upgrade') {
+                    data = {
+                        type: 'sub',
+                        user: event.chatter_user_name,
+                        message: `Converted Prime Sub to Tier ${event.prime_paid_upgrade.sub_tier === '2000' ? '2' : (event.prime_paid_upgrade.sub_tier === '3000' ? '3' : '1')}`
+                    };
                 }
                 else if (noticeType === 'pay_it_forward') {
                     const originalGifter = payForward.gifter_is_anonymous ? "Anonymous" : payForward.gifter_user_name;
@@ -789,13 +796,6 @@
                         type: 'giftsub', 
                         user: event.chatter_user_name, 
                         message: `Is Paying Forward a gift from ${originalGifter}!` 
-                    };
-                }
-                else if (noticeType === 'prime_paid_upgrade') {
-                    data = { 
-                        type: 'sub', 
-                        user: event.chatter_user_name, 
-                        message: `Converted Prime Sub to Tier ${event.prime_paid_upgrade.sub_plan === '2000' ? '2' : (event.prime_paid_upgrade.sub_plan === '3000' ? '3' : '1')}` 
                     };
                 }
                 else if (noticeType === 'gift_paid_upgrade') {
