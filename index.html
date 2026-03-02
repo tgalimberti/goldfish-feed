@@ -375,6 +375,17 @@
                         <input type="checkbox" id="opt-hide-viewers" onchange="toggleViewerCount(this.checked)"> Hide Viewer Count
                     </label>
                 </div>
+
+                <div class="control-group" style="margin-top: 10px;">
+                    <div class="control-header" style="color: #fff;">Feed Retention</div>
+                    <select id="opt-retention" onchange="updateRetention(this.value)" style="background: #000; color: #fff; border: 1px solid #333; padding: 4px; border-radius: 4px; font-size: 0.8rem; width: fit-content;">
+                        <option value="0">Never Delete</option>
+                        <option value="12">12 Hours</option>
+                        <option value="24">24 Hours</option>
+                        <option value="168">1 Week</option>
+                        <option value="720">1 Month</option>
+                    </select>
+                    </div>
                 
                 <div class="control-header" style="color: #fff; margin-bottom: 8px; margin-top: 15px;">Feed Actions</div>
                 <div style="display: flex; gap: 10px;">
@@ -516,6 +527,10 @@
                 setInterval(fetchViewerCount, 60000);
                 setInterval(updateRelativeTimes, 60000);
                 setInterval(updateUptimeClock, 1000);
+
+                document.getElementById('opt-retention').value = localStorage.getItem('feedRetention') || "0";
+                runCleanup();
+                setInterval(runCleanup, 60000);
 
             } catch (e) {
                 console.error("Login failed:", e);
@@ -997,6 +1012,29 @@
             
             document.getElementById('uptime-clock').innerText = 
                 `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+
+        function updateRetention(hours) {
+            savePref('feedRetention', hours);
+            runCleanup();
+        }
+
+        function runCleanup() {
+            const hours = parseInt(localStorage.getItem('feedRetention')) || 0;
+            if (hours === 0) return;
+
+            const cutoff = Date.now() - (hours * 60 * 60 * 1000);
+            let changed = false;
+
+            document.querySelectorAll('.event-item').forEach(el => {
+                const timestamp = parseInt(el.querySelector('.timestamp').getAttribute('data-time'));
+                if (timestamp < cutoff) {
+                    el.remove();
+                    changed = true;
+                }
+            });
+
+            if (changed) saveSession();
         }
 
         // UI Logic
