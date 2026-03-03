@@ -249,10 +249,10 @@
         .event-item.donation.active { background-color: var(--color-donation); }
         .event-item.raid.active { background-color: var(--color-raid); }
         .event-item.poll.active { background-color: var(--color-poll); }
-        .event-item.shoutout.active { background-color: var(--color-giftsub); }
-        .event-item.announcement.active { background-color: var(--color-raid); }
-        .event-item.prediction.active { background-color: var(--color-poll); }
-        .event-item.whisper.active { background-color: var(--color-raid); }
+        .event-item.shoutout.active { background-color: var(--color-shoutout); }
+        .event-item.announcement.active { background-color: var(--color-announcement); }
+        .event-item.prediction.active { background-color: var(--color-prediction); }
+        .event-item.whisper.active { background-color: var(--color-whisper); }
 
         .event-item.active .username,
         .event-item.active .message,
@@ -1217,7 +1217,7 @@
             group.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
                     <label style="cursor: pointer;" title="Change ${type} color">
-                        <input type="color" value="${colors[type]}" onchange="updateEventColor('${type}', this.value)" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                        <input type="color" value="${colors[type]}" oninput="updateEventColor('${type}', this.value)" style="opacity: 0; width: 0; height: 0; position: absolute;">
                         <span class="control-header" id="label-color-${type}" style="color: ${colors[type]};">${type}</span>
                     </label>
                     <button class="test-btn" onclick="testFire('${type}')" title="Test Fire" style="background:none; border:none; color:#666; cursor:pointer; font-size:0.8rem; padding:0 4px;">
