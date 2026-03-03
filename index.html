@@ -27,6 +27,8 @@
             --color-announcement: #ff544f;
             --color-prediction: #00cefa;
             --color-whisper: #ff544f;
+            --color-goal: #31c3a2;
+            --color-adbreak: #ffb300;
         }
 
         body {
@@ -240,6 +242,11 @@
         .event-item.whisper { border-left-color: var(--color-whisper); }
         .event-item.whisper .icon-box { color: var(--color-whisper); }
 
+        .event-item.goal { border-left-color: var(--color-goal); }
+        .event-item.goal .icon-box { color: var(--color-goal); }
+
+        .event-item.adbreak { border-left-color: var(--color-adbreak); }
+        .event-item.adbreak .icon-box { color: var(--color-adbreak); }
 
         .event-item.follow.active { background-color: var(--color-follow); }
         .event-item.sub.active { background-color: var(--color-sub); }
@@ -253,6 +260,8 @@
         .event-item.announcement.active { background-color: var(--color-announcement); }
         .event-item.prediction.active { background-color: var(--color-prediction); }
         .event-item.whisper.active { background-color: var(--color-whisper); }
+        .event-item.goal.active { background-color: var(--color-whisper); }
+        .event-item.goal.active { background-color: var(--color-goal); }
 
         .event-item.active .username,
         .event-item.active .message,
@@ -1189,7 +1198,9 @@
             shoutout: '#a970ff',
             prediction: '#00cefa',
             whisper: '#ff544f',
-            donation: '#00fa9a'
+            donation: '#00fa9a',
+            goal: '#31c3a2',
+            adbreak: '#ffb300'
         };
 
         const savedColors = JSON.parse(localStorage.getItem('customColors')) || {};

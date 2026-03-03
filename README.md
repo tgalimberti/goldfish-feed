@@ -18,7 +18,7 @@ Goldfish Feed is a simple, browser-based activity feed for Twitch streamers who 
 - [ ] Integrate 3rd-party events:
     - [x] Streamlabs
     - [ ] Streamelements
-- [ ] Add test events 
+- [x] Add test events 
 
 ## Limitations
 - **Live-only:** Because this is a live feed, it only tracks events that happen while the Goldfish Feed tab is open.
