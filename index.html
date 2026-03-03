@@ -23,6 +23,10 @@
             --color-raid: #ff544f;
             --color-poll: #00cefa;
             --color-hypetrain: #ffb300;
+            --color-shoutout: #a970ff;
+            --color-announcement: #ff544f;
+            --color-prediction: #00cefa;
+            --color-whisper: #ff544f;
         }
 
         body {
@@ -1188,13 +1192,34 @@
             donation: '#00fa9a'
         };
 
+        const savedColors = JSON.parse(localStorage.getItem('customColors')) || {};
+        for (const [type, color] of Object.entries(savedColors)) {
+            if (colors[type]) {
+                colors[type] = color;
+                document.documentElement.style.setProperty(`--color-${type}`, color);
+            }
+        }
+
+        function updateEventColor(type, colorHex) {
+            colors[type] = colorHex;
+            document.documentElement.style.setProperty(`--color-${type}`, colorHex);
+            document.getElementById(`label-color-${type}`).style.color = colorHex;
+
+            const saved = JSON.parse(localStorage.getItem('customColors')) || {};
+            saved[type] = colorHex;
+            localStorage.setItem('customColors', JSON.stringify(saved));
+        }
+
         types.forEach(type => {
             settings[type] = { show: true, highlight: true };
             const group = document.createElement('div');
             group.className = 'control-group';
             group.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
-                    <div class="control-header" style="color: ${colors[type]}">${type}</div>
+                    <label style="cursor: pointer;" title="Change ${type} color">
+                        <input type="color" value="${colors[type]}" onchange="updateEventColor('${type}', this.value)" style="opacity: 0; width: 0; height: 0; position: absolute;">
+                        <span class="control-header" id="label-color-${type}" style="color: ${colors[type]};">${type}</span>
+                    </label>
                     <button class="test-btn" onclick="testFire('${type}')" title="Test Fire" style="background:none; border:none; color:#666; cursor:pointer; font-size:0.8rem; padding:0 4px;">
                         <i class="fa-solid fa-flask"></i>
                     </button>
