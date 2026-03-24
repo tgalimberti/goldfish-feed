@@ -732,6 +732,23 @@
             });
         }
 
+        function completeActiveHypeTrains() {
+            let changed = false;
+            document.querySelectorAll('.event-item.hypetrain.active').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('acknowledged');
+                
+                const timerBar = el.querySelector('.timer-bg');
+                if (timerBar) {
+                    timerBar.style.transition = 'none'; // Stop the animation
+                    timerBar.style.width = '0%';        // Collapse it instantly
+                }
+                changed = true;
+            });
+            
+            if (changed) saveSession();
+        }
+
         // Handle events
         function handleNotification(payload) {
             const event = payload.event;
@@ -907,19 +924,21 @@
                 }
             }
             else if (type === 'channel.hype_train.begin') {
+                completeActiveHypeTrains();
                 currentHypeLevel = 1;
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
-                data = { 
-                    type: 'hypetrain', 
-                    user: 'Hype Train', 
-                    message: `Level 1 • ${percent}%`, 
-                    expiresAt: event.expires_at 
+                data = {
+                    type: 'hypetrain',
+                    user: 'Hype Train',
+                    message: `Level 1 • ${percent}%`,
+                    expiresAt: event.expires_at
                 };
             }
             else if (type === 'channel.hype_train.progress') {
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
-                
+
                 if (event.level > currentHypeLevel) {
+                    completeActiveHypeTrains();
                     currentHypeLevel = event.level;
                     data = {
                         type: 'hypetrain',
@@ -939,7 +958,8 @@
                 }
             }
             else if (type === 'channel.hype_train.end') {
-                currentHypeLevel = 0; 
+                completeActiveHypeTrains();
+                currentHypeLevel = 0;
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
             }
 
