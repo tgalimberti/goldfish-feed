@@ -688,6 +688,7 @@
                 { type: 'channel.follow', version: '2', condition: { broadcaster_user_id: userId, moderator_user_id: userId } },
                 { type: 'channel.bits.use', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.channel_points_custom_reward_redemption.add', version: '1', condition: { broadcaster_user_id: userId } },
+                { type: 'channel.channel_points_automatic_reward_redemption.add', version: '2', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.poll.begin', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.poll.end', version: '1', condition: { broadcaster_user_id: userId } },
                 { type: 'channel.hype_train.begin', version: '2', condition: { broadcaster_user_id: userId } },
@@ -871,20 +872,11 @@
                 data = { type: 'follow', user: event.user_name, message: 'Followed you' };
             }
             else if (type === 'channel.bits.use') {
-                const user = event.user_name || 'Anonymous';
-                let messageText = `Used ${event.bits} Bits`;
-                
-                if (event.power_up) {
-                    messageText = `Used Power-up: ${event.power_up.name || 'Unknown'} (${event.bits} bits)`;
-                } else {
-                    messageText = `Cheered ${event.bits} bits`;
-                }
-
-                data = { 
-                    type: 'cheer', 
-                    user: user, 
-                    message: messageText, 
-                    chatMessage: event.message ? event.message.text : '' 
+                data = {
+                    type: 'cheer',
+                    user: event.user_name || 'Anonymous',
+                    message: `Cheered ${event.bits} bits`,
+                    chatMessage: event.message ? event.message.text : ''
                 };
             }
             else if (type === 'channel.channel_points_custom_reward_redemption.add') {
@@ -893,6 +885,17 @@
                     user: event.user_name, 
                     message: `Redeemed ${event.reward.title}`,
                     chatMessage: event.user_input
+                };
+            }
+            else if (type === 'channel.channel_points_automatic_reward_redemption.add') {
+                const rewardType = event.reward.type;
+                const readableType = rewardType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+
+                data = {
+                    type: 'redeem',
+                    user: event.user_name,
+                    message: `Used Power-up: ${readableType}`,
+                    chatMessage: event.message?.text || ''
                 };
             }
             else if (type === 'channel.poll.begin') {
