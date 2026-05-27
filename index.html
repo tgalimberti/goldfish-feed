@@ -755,6 +755,29 @@
             
             if (changed) saveSession();
         }
+        function completeActiveHypeTrains() {
+            let changed = false;
+            document.querySelectorAll('.event-item.hypetrain.active').forEach(el => {
+                el.classList.remove('active');
+                el.classList.add('acknowledged');
+                
+                const timerBar = el.querySelector('.timer-bg');
+                if (timerBar) {
+                    timerBar.style.transition = 'none'; 
+                    timerBar.style.width = '0%';        
+                }
+                changed = true;
+            });
+            
+            if (changed) saveSession();
+        }
+
+        // Helper to match Twitch's native "DisplayName (login)" format
+        function formatName(name, login) {
+            if (!name) return 'Anonymous';
+            if (!login) return name; // Fallback for Streamlabs
+            return name.toLowerCase() === login.toLowerCase() ? name : `${name} (${login})`;
+        }
 
         // Handle events
         function handleNotification(payload) {
@@ -771,18 +794,17 @@
                 const raid = event.raid;
                 const payForward = event.pay_it_forward;
 
+                const chatterName = formatName(event.chatter_user_name, event.chatter_user_login);
+                const chatterLogin = event.chatter_user_login || '';
+
                 if (noticeType === 'sub') {
                     const plan = String(sub.sub_plan || sub.sub_tier);
                     const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
-                    
-                    const durationText = (sub.duration_months && sub.duration_months > 1) 
-                        ? ` for ${sub.duration_months} Months` 
-                        : '';
 
                     if (sub.is_prime || plan === "Prime") {
-                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed${durationText} with Prime` };
+                         data = { type: 'sub', user: chatterName, login: chatterLogin, message: `Subscribed with Prime` };
                     } else {
-                         data = { type: 'sub', user: event.chatter_user_name, message: `Subscribed${durationText} (Tier ${tier})` };
+                         data = { type: 'sub', user: chatterName, login: chatterLogin, message: `Subscribed (Tier ${tier})` };
                     }
                 }
                 else if (noticeType === 'resub') {
@@ -790,7 +812,7 @@
                     const tier = plan === "Prime" ? "Prime" : (plan === "2000" ? "2" : (plan === "3000" ? "3" : "1"));
                     const months = resub.cumulative_months;
                     const streak = resub.streak_months;
-                    
+
                     const streakText = streak ? ` [${streak} Month Streak]` : '';
 
                     let msgText = `Resubscribed for ${months} months (Tier ${tier})${streakText}`;
@@ -800,7 +822,8 @@
 
                     data = {
                         type: 'sub',
-                        user: event.chatter_user_name,
+                        user: chatterName,
+                        login: chatterLogin,
                         message: msgText,
                         chatMessage: event.message?.text
                     };
@@ -809,22 +832,26 @@
                     if (!subGift.community_gift_id) {
                          const tierStr = String(subGift.sub_tier);
                          const tier = tierStr === "2000" ? "2" : (tierStr === "3000" ? "3" : "1");
-                         const recipient = subGift.recipient_user_name;
-                         const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
+                         const recipient = formatName(subGift.recipient_user_name, subGift.recipient_user_login);
+                         
+                         const gifterName = event.chatter_is_anonymous ? "Anonymous Gifter" : chatterName;
+                         const gifterLogin = event.chatter_is_anonymous ? "" : chatterLogin;
 
                          const validGiftDurations = [3, 6, 12];
                          const durationText = validGiftDurations.includes(subGift.duration_months)
                              ? ` ${subGift.duration_months}-Month`
                              : '';
 
-                         data = { type: 'giftsub', user: gifter, message: `Gifted a${durationText} Tier ${tier} Sub to ${recipient}` };
+                         data = { type: 'giftsub', user: gifterName, login: gifterLogin, message: `Gifted a${durationText} Tier ${tier} Sub to ${recipient}` };
                     }
                 }
                 else if (noticeType === 'community_sub_gift') {
                     const count = communityGift.total;
                     const tierStr = String(communityGift.sub_tier);
                     const tier = tierStr === "2000" ? "2" : (tierStr === "3000" ? "3" : "1");
-                    const gifter = event.chatter_is_anonymous ? "Anonymous Gifter" : event.chatter_user_name;
+                    
+                    const gifterName = event.chatter_is_anonymous ? "Anonymous Gifter" : chatterName;
+                    const gifterLogin = event.chatter_is_anonymous ? "" : chatterLogin;
                     const cumulative = communityGift.cumulative_total;
 
                     let msg = `Gifted ${count} Tier ${tier} Subs`;
@@ -832,76 +859,74 @@
                         msg += ` (Total Given: ${cumulative})`;
                     }
 
-                    data = { type: 'giftsub', user: gifter, message: msg };
+                    data = { type: 'giftsub', user: gifterName, login: gifterLogin, message: msg };
+                }
+                else if (noticeType === 'pay_it_forward') {
+                    const originalGifter = payForward.gifter_is_anonymous ? "Anonymous" : formatName(payForward.gifter_user_name, payForward.gifter_user_login);
+                    data = {
+                        type: 'giftsub',
+                        user: chatterName,
+                        login: chatterLogin,
+                        message: `Is Paying Forward a gift from ${originalGifter}!`
+                    };
                 }
                 else if (noticeType === 'prime_paid_upgrade') {
                     data = {
                         type: 'sub',
-                        user: event.chatter_user_name,
+                        user: chatterName,
+                        login: chatterLogin,
                         message: `Converted Prime Sub to Tier ${event.prime_paid_upgrade.sub_tier === '2000' ? '2' : (event.prime_paid_upgrade.sub_tier === '3000' ? '3' : '1')}`
-                    };
-                }
-                else if (noticeType === 'pay_it_forward') {
-                    const originalGifter = payForward.gifter_is_anonymous ? "Anonymous" : payForward.gifter_user_name;
-                    const recipient = payForward.recipient_user_name || "the community"; 
-                    data = { 
-                        type: 'giftsub', 
-                        user: event.chatter_user_name, 
-                        message: `Is Paying Forward a gift from ${originalGifter}!` 
                     };
                 }
                 else if (noticeType === 'gift_paid_upgrade') {
                     const upgrade = event.gift_paid_upgrade;
-                    const gifter = upgrade.gifter_is_anonymous ? "Anonymous" : upgrade.gifter_user_name;
-                    data = { 
-                        type: 'sub', 
-                        user: event.chatter_user_name, 
-                        message: `Continued the gift sub from ${gifter}!` 
+                    const originalGifter = upgrade.gifter_is_anonymous ? "Anonymous" : formatName(upgrade.gifter_user_name, upgrade.gifter_user_login);
+                    data = {
+                        type: 'sub',
+                        user: chatterName,
+                        login: chatterLogin,
+                        message: `Continued the gift sub from ${originalGifter}!`
                     };
                 }
                 else if (noticeType === 'raid') {
-                    const viewerCount = raid.viewer_count;
-                    data = { type: 'raid', user: event.chatter_user_name, userId: event.chatter_user_id,
-                            message: `Raided with ${viewerCount} viewers` };
+                    data = { type: 'raid', user: chatterName, login: chatterLogin, userId: event.chatter_user_id, message: `Raided with ${raid.viewer_count} viewers` };
                 }
                 else if (noticeType === 'announcement') {
                     data = {
-                    type: 'announcement',
-                    user: event.chatter_user_name,
-                    message: 'Announcement',
-                    chatMessage: event.message.text
+                        type: 'announcement',
+                        user: chatterName,
+                        login: chatterLogin,
+                        message: 'Announcement',
+                        chatMessage: event.message.text
                     };
                 }
             }
-
             else if (type === 'channel.follow') {
-                data = { type: 'follow', user: event.user_name, message: 'Followed you' };
+                data = { type: 'follow', user: formatName(event.user_name, event.user_login), login: event.user_login, message: 'Followed you' };
             }
             else if (type === 'channel.bits.use') {
+                let messageText = `Used ${event.bits} Bits`;
+                if (event.power_up) {
+                    messageText = `Used Power-up: ${event.power_up.name || 'Unknown'} (${event.bits} bits)`;
+                } else {
+                    messageText = `Cheered ${event.bits} bits`;
+                }
+
                 data = {
                     type: 'cheer',
-                    user: event.user_name || 'Anonymous',
-                    message: `Cheered ${event.bits} bits`,
+                    user: formatName(event.user_name, event.user_login) || 'Anonymous',
+                    login: event.user_login || '',
+                    message: messageText,
                     chatMessage: event.message ? event.message.text : ''
                 };
             }
             else if (type === 'channel.channel_points_custom_reward_redemption.add') {
-                data = { 
-                    type: 'redeem', 
-                    user: event.user_name, 
-                    message: `Redeemed ${event.reward.title}`,
-                    chatMessage: event.user_input
-                };
-            }
-            else if (type === 'channel.channel_points_automatic_reward_redemption.add') {
-                const rewardType = event.reward.type;
-                const readableType = rewardType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-
                 data = {
                     type: 'redeem',
-                    user: event.user_name,
-                    message: `Used Power-up: ${readableType}`,
-                    chatMessage: event.message?.text || ''
+                    user: formatName(event.user_name, event.user_login),
+                    login: event.user_login,
+                    message: `Redeemed ${event.reward.title}`,
+                    chatMessage: event.user_input
                 };
             }
             else if (type === 'channel.poll.begin') {
@@ -910,23 +935,19 @@
             else if (type === 'channel.poll.end') {
                 const maxVotes = Math.max(...event.choices.map(c => c.votes));
                 const winners = event.choices.filter(c => c.votes === maxVotes);
-                const winnerText = winners.map(w => w.title).join(" & "); // e.g. "Pizza & Burgers"
+                const winnerText = winners.map(w => w.title).join(" & ");
                 const message = `Winner: ${winnerText} (${maxVotes} votes)`;
 
                 const existingPoll = document.querySelector('.event-item.poll.active');
-                
                 if (existingPoll) {
                     existingPoll.querySelector('.username').innerText = 'Poll Ended';
                     existingPoll.querySelector('.message').innerText = message;
-                    
                     existingPoll.classList.remove('active');
                     existingPoll.classList.add('acknowledged');
-                    
                     const raw = JSON.parse(existingPoll.dataset.raw);
                     raw.message = message;
                     raw.user = 'Poll Ended';
                     existingPoll.dataset.raw = JSON.stringify(raw);
-                    
                     saveSession();
                 } else {
                     data = { type: 'poll', user: 'Poll Ended', message: message };
@@ -936,25 +957,14 @@
                 completeActiveHypeTrains();
                 currentHypeLevel = 1;
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
-                data = {
-                    type: 'hypetrain',
-                    user: 'Hype Train',
-                    message: `Level 1 • ${percent}%`,
-                    expiresAt: event.expires_at
-                };
+                data = { type: 'hypetrain', user: 'Hype Train', message: `Level 1 • ${percent}%`, expiresAt: event.expires_at };
             }
             else if (type === 'channel.hype_train.progress') {
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
-
                 if (event.level > currentHypeLevel) {
                     completeActiveHypeTrains();
                     currentHypeLevel = event.level;
-                    data = {
-                        type: 'hypetrain',
-                        user: 'Hype Train',
-                        message: `Level ${event.level} • ${percent}%`,
-                        expiresAt: event.expires_at
-                    };
+                    data = { type: 'hypetrain', user: 'Hype Train', message: `Level ${event.level} • ${percent}%`, expiresAt: event.expires_at };
                 } else {
                     const existing = document.querySelector('.event-item.hypetrain.active');
                     if (existing) {
@@ -971,19 +981,20 @@
                 currentHypeLevel = 0;
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
             }
-
             else if (type === 'channel.shoutout.create') {
-                data = { 
-                    type: 'shoutout', 
-                    user: event.to_broadcaster_user_name, 
-                    message: `You gave a Shoutout!` 
+                data = {
+                    type: 'shoutout',
+                    user: formatName(event.to_broadcaster_user_name, event.to_broadcaster_user_login),
+                    login: event.to_broadcaster_user_login,
+                    message: `You gave a Shoutout!`
                 };
             }
             else if (type === 'channel.shoutout.receive') {
-                data = { 
-                    type: 'shoutout', 
-                    user: event.from_broadcaster_user_name, 
-                    message: `Gave you a Shoutout to (${event.viewer_count} viewers)` 
+                data = {
+                    type: 'shoutout',
+                    user: formatName(event.from_broadcaster_user_name, event.from_broadcaster_user_login),
+                    login: event.from_broadcaster_user_login,
+                    message: `Gave you a Shoutout to (${event.viewer_count} viewers)`
                 };
             }
             else if (type === 'channel.prediction.begin') {
@@ -994,7 +1005,6 @@
                 const winner = event.outcomes.find(o => o.id === winningId);
                 const title = winner ? winner.title : 'N/A';
                 const points = winner ? winner.channel_points : 0;
-                
                 data = { type: 'prediction', user: 'Prediction Ended', message: `Winner: ${title} (${points} pts)` };
             }
             else if (type === 'user.whisper.message') {
@@ -1005,10 +1015,13 @@
                     if (urlMatch) {
                         extractedLink = urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[0]}`;
                     }
+                    
+                    const whisperName = formatName(event.from_user_name, event.from_user_login);
 
                     data = {
                         type: 'whisper',
-                        user: `${event.from_user_name} (Mod)`,
+                        user: `${whisperName} (Mod)`,
+                        login: event.from_user_login, // Pure login name for URL
                         userId: event.from_user_id,
                         message: text,
                         link: extractedLink
@@ -1391,7 +1404,8 @@
             const systemEvents = ['poll', 'hypetrain', 'prediction', 'goal', 'adbreak'];
             const isSystem = systemEvents.includes(data.type);
 
-            const urlUser = data.user.replace(' (Mod)', '');
+            // If API provided a login, use it. Otherwise fallback to display name (for Streamlabs).
+            const urlUser = data.login ? data.login : data.user.replace(' (Mod)', '');
 
             const userHtml = isSystem
                 ? `<span class="username">${data.user}</span>`
