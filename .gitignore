@@ -1,0 +1,19 @@
+# Hermes / agent-local state (keep out of the live site repo)
+.hermes/
+*.hermes
+hermes-*
+agent-*
+*.session
+
+# Backup / temp artifacts created by tooling
+*.bak
+*.tmp
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.code-workspace
