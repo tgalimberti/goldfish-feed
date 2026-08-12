@@ -5,6 +5,11 @@ hermes-*
 agent-*
 *.session
 
+# Scratch / local preview files (never shipped)
+*-test.html
+*.scratch.html
+scratch/
+
 # Backup / temp artifacts created by tooling
 *.bak
 *.tmp
