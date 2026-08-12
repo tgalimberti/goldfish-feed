@@ -306,6 +306,9 @@
 
         .event-item.hypetrain.active {
             background-color: #1f1f23 !important;
+        }
+
+        .event-item.hypetrain.floating {
             order: -1;
             position: sticky;
             top: 20px;
@@ -691,7 +694,49 @@
         }
 
         // Subscriptions
+        async function cleanupOldSubscriptions() {
+            // Remove EventSub subscriptions that are stale leftovers from a previous
+            // websocket session. Each page load opens a NEW session_id, and Twitch
+            // keeps older subscriptions around until it notices their transport
+            // session is gone — so without cleanup, repeated loads (or reconnects)
+            // would slowly accumulate duplicate subscriptions server-side.
+            //
+            // Anything pointing at a session other than the current one, or whose
+            // status means it can't deliver (e.g. websocket disconnected / auth
+            // revoked), is safe to delete. The token only sees the broadcaster's own
+            // subscriptions, so this can't touch anything unrelated.
+            try {
+                const res = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions?status=all', {
+                    headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
+                });
+                if (res.status === 401) { handleTokenExpiry(); return; }
+                const data = await res.json();
+
+                const stale = (data.data || []).filter(sub => {
+                    // Only treat a sub as from a "previous session" if we actually
+                    // have a current session to compare against. Guard against ever
+                    // nuking live subscriptions if sessionId is somehow not set yet.
+                    const session = sub.transport && sub.transport.session_id;
+                    const staleSession = Boolean(sessionId) ? (session && session !== sessionId) : false;
+                    const deadStatus = ['websocket_disconnected', 'authorization_revoked', 'user_removed'].includes(sub.status);
+                    return staleSession || deadStatus;
+                });
+
+                for (const sub of stale) {
+                    await fetch(`https://api.twitch.tv/helix/eventsub/subscriptions?id=${sub.id}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${accessToken}`, 'Client-Id': CLIENT_ID }
+                    });
+                }
+                if (stale.length) console.log(`Cleaned up ${stale.length} stale EventSub subscription(s).`);
+            } catch (e) {
+                console.error("Failed to clean up stale subscriptions:", e);
+            }
+        }
+
         async function subscribeToEvents() {
+            await cleanupOldSubscriptions();
+
             const subs = [
                 { type: 'channel.follow', version: '2', condition: { broadcaster_user_id: userId, moderator_user_id: userId } },
                 { type: 'channel.bits.use', version: '1', condition: { broadcaster_user_id: userId } },
@@ -741,12 +786,16 @@
             });
         }
 
-        function completeActiveHypeTrains() {
+        // Called whenever a new hype train (or a new level of the current train)
+        // starts, or the current train ends: the previously-floating hype-train
+        // card stops sticking to the top and "settles" into the feed as a normal
+        // card. It stays highlighted (active) so the streamer can still read the
+        // final level; it only greys out when clicked, like any other event.
+        function settleFloatingHypeTrains() {
             let changed = false;
-            document.querySelectorAll('.event-item.hypetrain.active').forEach(el => {
-                el.classList.remove('active');
-                el.classList.add('acknowledged');
-                
+            document.querySelectorAll('.event-item.hypetrain.floating').forEach(el => {
+                el.classList.remove('floating');
+
                 const timerBar = el.querySelector('.timer-bg');
                 if (timerBar) {
                     timerBar.style.transition = 'none'; // Stop the animation
@@ -758,23 +807,28 @@
             if (changed) saveSession();
         }
 
-        // Clean up any stale active hype-train card that is still floating/sticky.
-        // This is a safety net: if the `channel.hype_train.end` notification (or the
-        // card's own timer) is ever missed — e.g. while the tab is open but the page
-        // was backgrounded — the sticky card would otherwise stay pinned at the top
-        // forever. Runs on the periodic cleanup interval.
+        // Safety net for the same "settle" behavior: if the `channel.hype_train.end`
+        // notification (or the card's own timer) is ever missed — e.g. while the tab
+        // is open but the page was backgrounded — the floating card would otherwise
+        // stay pinned at the top forever. Once a card's expiresAt passes, drop the
+        // floating state so it settles into the feed. Runs on the periodic interval.
         function cleanupStaleHypeTrain() {
             const now = Date.now();
             let changed = false;
-            document.querySelectorAll('.event-item.hypetrain.active').forEach(el => {
+            document.querySelectorAll('.event-item.hypetrain.floating').forEach(el => {
                 let expiresAt = null;
                 try {
                     expiresAt = JSON.parse(el.dataset.raw).expiresAt;
                 } catch (e) { /* ignore malformed data */ }
 
                 if (expiresAt && now >= parseInt(expiresAt)) {
-                    el.classList.remove('active');
-                    el.classList.add('acknowledged');
+                    el.classList.remove('floating');
+
+                    const timerBar = el.querySelector('.timer-bg');
+                    if (timerBar) {
+                        timerBar.style.transition = 'none';
+                        timerBar.style.width = '0%';
+                    }
                     changed = true;
                 }
             });
@@ -963,7 +1017,7 @@
                 }
             }
             else if (type === 'channel.hype_train.begin') {
-                completeActiveHypeTrains();
+                settleFloatingHypeTrains();
                 currentHypeLevel = 1;
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Level 1 • ${percent}%`, expiresAt: event.expires_at };
@@ -971,11 +1025,11 @@
             else if (type === 'channel.hype_train.progress') {
                 const percent = Math.round((event.progress / event.goal) * 100) || 0;
                 if (event.level > currentHypeLevel) {
-                    completeActiveHypeTrains();
+                    settleFloatingHypeTrains();
                     currentHypeLevel = event.level;
                     data = { type: 'hypetrain', user: 'Hype Train', message: `Level ${event.level} • ${percent}%`, expiresAt: event.expires_at };
                 } else {
-                    const existing = document.querySelector('.event-item.hypetrain.active');
+                    const existing = document.querySelector('.event-item.hypetrain.floating');
                     if (existing) {
                         existing.querySelector('.message').innerText = `Level ${event.level} • ${percent}%`;
                         const raw = JSON.parse(existing.dataset.raw);
@@ -986,8 +1040,28 @@
                 }
             }
             else if (type === 'channel.hype_train.end') {
-                completeActiveHypeTrains();
+                // Settle the now-finished card into the feed and show the final
+                // level on it. It stays highlighted (active) so the streamer can
+                // read the level at a glance; it only greys out once clicked.
+                // No second "Ended" card is added — the settled card is the record.
                 currentHypeLevel = 0;
+                const finished = document.querySelector('.event-item.hypetrain.floating');
+                if (finished) {
+                    finished.classList.remove('floating');
+                    const finalMessage = `Ended at Level ${event.level}`;
+                    finished.querySelector('.message').innerText = finalMessage;
+                    if (finished.querySelector('.timer-bg')) {
+                        finished.querySelector('.timer-bg').style.transition = 'none';
+                        finished.querySelector('.timer-bg').style.width = '0%';
+                    }
+                    try {
+                        const raw = JSON.parse(finished.dataset.raw);
+                        raw.message = finalMessage;
+                        finished.dataset.raw = JSON.stringify(raw);
+                    } catch (err) { /* ignore malformed data */ }
+                    saveSession();
+                    return; // don't add a separate "Ended" card
+                }
                 data = { type: 'hypetrain', user: 'Hype Train', message: `Ended at Level ${event.level}` };
             }
             else if (type === 'channel.shoutout.create') {
@@ -1341,7 +1415,7 @@
                     break;
 
                 case 'hypetrain':
-                    completeActiveHypeTrains();
+                    settleFloatingHypeTrains();
                     mockData.user = 'Hype Train';
                     mockData.message = 'Level 3 • 65%';
                     mockData.expiresAt = Date.now() + 300000; 
@@ -1400,7 +1474,10 @@
                 ? 'acknowledged'
                 : (settings[data.type].highlight ? 'active' : 'acknowledged');
 
-            el.className = `event-item ${data.type} ${initialState}`;
+            // A live hype train floats/sticks to the top while active. The 'floating'
+            // class only controls that positioning; 'active' controls the highlight.
+            const isLiveHypetrain = data.type === 'hypetrain' && data.expiresAt && !forceAck;
+            el.className = `event-item ${data.type} ${initialState}${isLiveHypetrain ? ' floating' : ''}`;
 
             const now = forceTime ? parseInt(forceTime) : Date.now();
             const relTime = getRelativeTime(now);
@@ -1487,9 +1564,15 @@
                     }, 500);
 
                     setTimeout(() => {
-                        if (el.isConnected && el.classList.contains('active')) {
-                            el.classList.remove('active');
-                            el.classList.add('acknowledged');
+                        if (el.isConnected && el.classList.contains('floating')) {
+                            // Train ran out: settle the card into the feed. It stays
+                            // highlighted (active) for the streamer to read; it only
+                            // greys out when clicked.
+                            el.classList.remove('floating');
+                            if (timerBar) {
+                                timerBar.style.transition = 'none';
+                                timerBar.style.width = '0%';
+                            }
                             saveSession();
                         }
                     }, duration);
