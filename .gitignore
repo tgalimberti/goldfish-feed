@@ -10,6 +10,10 @@ agent-*
 *.scratch.html
 scratch/
 
+# Local development / verification tooling (never shipped)
+node_modules/
+verify/
+
 # Backup / temp artifacts created by tooling
 *.bak
 *.tmp
