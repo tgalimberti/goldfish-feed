@@ -1059,6 +1059,11 @@
                         raw.message = finalMessage;
                         finished.dataset.raw = JSON.stringify(raw);
                     } catch (err) { /* ignore malformed data */ }
+                    // The hype train ending is its own event: move the settled card
+                    // to the top of the feed (prepend moves the existing node), above
+                    // any follows/cheers that arrived during the final level — those
+                    // had been pinned below the floating card while the train ran.
+                    feed.prepend(finished);
                     saveSession();
                     return; // don't add a separate "Ended" card
                 }
