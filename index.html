@@ -829,6 +829,9 @@
                         timerBar.style.transition = 'none';
                         timerBar.style.width = '0%';
                     }
+                    // Keep consistent with the end handler / timer-expiry paths: the
+                    // level-end reads as its own event at the top of the feed.
+                    feed.prepend(el);
                     changed = true;
                 }
             });
@@ -1572,12 +1575,15 @@
                         if (el.isConnected && el.classList.contains('floating')) {
                             // Train ran out: settle the card into the feed. It stays
                             // highlighted (active) for the streamer to read; it only
-                            // greys out when clicked.
+                            // greys out when clicked. As with the end handler, move
+                            // the settled card to the top so the level-end reads as
+                            // its own event above anything that arrived mid-level.
                             el.classList.remove('floating');
                             if (timerBar) {
                                 timerBar.style.transition = 'none';
                                 timerBar.style.width = '0%';
                             }
+                            feed.prepend(el);
                             saveSession();
                         }
                     }, duration);
