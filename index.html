@@ -549,7 +549,9 @@
 
                 document.getElementById('opt-retention').value = localStorage.getItem('feedRetention') || "0";
                 runCleanup();
+                cleanupStaleHypeTrain();
                 setInterval(runCleanup, 60000);
+                setInterval(cleanupStaleHypeTrain, 60000);
 
             } catch (e) {
                 console.error("Login failed:", e);
@@ -755,20 +757,27 @@
             
             if (changed) saveSession();
         }
-        function completeActiveHypeTrains() {
+
+        // Clean up any stale active hype-train card that is still floating/sticky.
+        // This is a safety net: if the `channel.hype_train.end` notification (or the
+        // card's own timer) is ever missed — e.g. while the tab is open but the page
+        // was backgrounded — the sticky card would otherwise stay pinned at the top
+        // forever. Runs on the periodic cleanup interval.
+        function cleanupStaleHypeTrain() {
+            const now = Date.now();
             let changed = false;
             document.querySelectorAll('.event-item.hypetrain.active').forEach(el => {
-                el.classList.remove('active');
-                el.classList.add('acknowledged');
-                
-                const timerBar = el.querySelector('.timer-bg');
-                if (timerBar) {
-                    timerBar.style.transition = 'none'; 
-                    timerBar.style.width = '0%';        
+                let expiresAt = null;
+                try {
+                    expiresAt = JSON.parse(el.dataset.raw).expiresAt;
+                } catch (e) { /* ignore malformed data */ }
+
+                if (expiresAt && now >= parseInt(expiresAt)) {
+                    el.classList.remove('active');
+                    el.classList.add('acknowledged');
+                    changed = true;
                 }
-                changed = true;
             });
-            
             if (changed) saveSession();
         }
 
